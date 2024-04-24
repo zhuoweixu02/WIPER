@@ -20,7 +20,7 @@ class App:
         self.current_message_index = -1
 
         self.frame = tk.Frame(self.root)
-        self.frame.pack()
+        self.frame.pack(fill="both", expand=True)
 
         self.message_label = tk.Label(self.frame, text="Message:")
         self.message_label.grid(row=0, column=0)
@@ -64,9 +64,9 @@ class App:
         # Initialize the canvas
         self.canvas = tk.Canvas(
             root, width=self.canvas_width, height=self.canvas_height, bg='white')
-        self.canvas.pack()
+        self.canvas.pack(side="left", fill="both", expand=True)
 
-        self.scorllbar = tk.Scrollbar(self.root)
+        self.scorllbar = tk.Scrollbar(self.canvas, orient="vertical")
 
         # Set window title
         self.root.title("Interface")
