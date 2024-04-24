@@ -52,6 +52,34 @@ class App:
 
         self.message_label = tk.Label(self.frame, text="Message:")
         self.message_label.grid(row=0, column=0)
+        self.message_entry = tk.Entry(self.frame)
+        self.message_entry.grid(row=0, column=1)
+
+        # Bind Return key to send_message_event
+        self.message_entry.bind("<Return>", self.send_message_event)
+
+        self.send_button = tk.Button(
+            self.frame, text="Send", command=self.send_message)
+        self.send_button.grid(row=0, column=2)
+
+        self.message_history_label = tk.Label(
+            self.frame, text="Message History:")
+        self.message_history_label.grid(
+            row=1, column=0, columnspan=3, sticky="w")
+
+        self.message_history_text = tk.Text(self.frame, height=10, width=40)
+        self.message_history_text.grid(row=2, column=0, columnspan=3)
+
+        self.received_message_label = tk.Label(
+            self.frame, text="Received Message:")
+        self.received_message_label.grid(row=3, column=0, sticky="w")
+
+        self.received_message_text = tk.Text(self.frame, height=10, width=150)
+        self.received_message_text.grid(row=4, column=0, columnspan=3)
+
+        # Bind up and down arrow keys to load previous messages
+        self.master.bind("<Up>", self.load_previous_message)
+        self.master.bind("<Down>", self.load_next_message)
 
         self.canvas_width = 600
         self.canvas_height = 400
@@ -127,13 +155,18 @@ def data_collecting_thread(data_queue):
         data_queue.put((map_corners, plot_para))
 
 
-def receive_message_thread(ser):
-    while True:
-
-
 if __name__ == "__main__":
+    bluetooth_port = '/dev/cu.HC-06'  # for Mac
+    # bluetooth_port = 'COM6'  # for Windows
+
     root = tk.Tk()
-    app = App(root)
+    root.title("WIPER CONTROL")
+    app = App(root, None)  # Pass None initially for the BluetoothInterface
+
+    bluetooth_interface = BluetoothInterface(
+        port=bluetooth_port, baudrate=9600, app=app)
+    # Update app's BluetoothInterface reference
+    app.bluetooth_interface = bluetooth_interface
 
     # Start the background data collecting thread
     thread = threading.Thread(
