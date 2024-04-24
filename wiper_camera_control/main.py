@@ -64,9 +64,13 @@ class App:
         # Initialize the canvas
         self.canvas = tk.Canvas(
             root, width=self.canvas_width, height=self.canvas_height, bg='white')
-        self.canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.pack()
 
         self.scorllbar = tk.Scrollbar(self.canvas, orient="vertical")
+        self.scorllbar.pack(side="right", fill="y")
+
+        self.canvas.config(yscrollcommand=self.scorllbar.set)
+        self.scorllbar.config(command=self.canvas.yview)
 
         # Set window title
         self.root.title("Interface")
