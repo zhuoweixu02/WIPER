@@ -41,8 +41,8 @@ class App:
         self.received_message_text.grid(row=4, column=0, columnspan=3)
 
         # Bind up and down arrow keys to load previous messages
-        self.master.bind("<Up>", self.load_previous_message)
-        self.master.bind("<Down>", self.load_next_message)
+        self.root.bind("<Up>", self.load_previous_message)
+        self.root.bind("<Down>", self.load_next_message)
 
         self.canvas_width = 600
         self.canvas_height = 400
