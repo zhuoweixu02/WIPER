@@ -114,12 +114,14 @@ def capture_and_process_apriltag_data(ignore_first_seconds, capture_duration):
 def process_tags(data_storage):
     # Convert the list of lists to a structured array for easier processing
     df = pd.DataFrame(data_storage, columns=['Tag ID', 'X', 'Y', 'Z', 'Yaw'])
-    
+
     # Define the tag IDs you're interested in
-    tag_ids = [0, 1, 3, 4]  # Assuming these are the tag IDs you want to process
-    
-    averages = {2: {'X': 0.0, 'Y': 0.0}}  # Manually adding Tag 2 as origin (0, 0)
-    
+    # Assuming these are the tag IDs you want to process
+    tag_ids = [0, 1, 3, 4]
+
+    # Manually adding Tag 2 as origin (0, 0)
+    averages = {2: {'X': 0.0, 'Y': 0.0}}
+
     for tag_id in tag_ids:
         tag_data = df[df['Tag ID'] == tag_id]
         if not tag_data.empty:
@@ -128,16 +130,19 @@ def process_tags(data_storage):
             averages[tag_id] = {'X': avg_data['X'], 'Y': avg_data['Y']}
 
     # Define tag size with safety factor
-    tag_size_with_safety = 0.103 * (1 + 0.20)  # Tag size including safety factor in meters
-    half_exclusion = tag_size_with_safety / 2 
-    
+    # Tag size including safety factor in meters
+    tag_size_with_safety = 0.103 * (1 + 0.20)
+    half_exclusion = tag_size_with_safety / 2
+
     # Calculating the corners for each tag
     map_corners = {}
     for tag_id, avg in averages.items():
         x, y = avg['X'], avg['Y']
         map_corners[tag_id] = [
-            {'x': x - half_exclusion, 'y': y - half_exclusion},  # Bottom-left corner
-            {'x': x + half_exclusion, 'y': y - half_exclusion},  # Bottom-right corner
+            {'x': x - half_exclusion, 'y': y -
+                half_exclusion},  # Bottom-left corner
+            {'x': x + half_exclusion, 'y': y - \
+                half_exclusion},  # Bottom-right corner
             {'x': x + half_exclusion, 'y': y + half_exclusion},  # Top-right corner
             {'x': x - half_exclusion, 'y': y + half_exclusion},  # Top-left corner
         ]
@@ -147,9 +152,10 @@ def process_tags(data_storage):
         for corner in corners:
             ox.append(corner['x'])
             oy.append(corner['y'])
-    
+
     for tag_id, corners in map_corners.items():
-            corner_xs, corner_ys = zip(*[(corner['x'], corner['y']) for corner in corners])
+        corner_xs, corner_ys = zip(
+            *[(corner['x'], corner['y']) for corner in corners])
 
     # Additional variables for boundary definition
     min_x, min_y = float('inf'), float('inf')
@@ -175,7 +181,8 @@ def process_tags(data_storage):
     # Visualization code (continued)
     # Plotting the map boundary
     # Corrected access to dictionary elements
-    boundary_xs, boundary_ys = zip(*[(corner['x'], corner['y']) for corner in boundary_corners])
+    boundary_xs, boundary_ys = zip(
+        *[(corner['x'], corner['y']) for corner in boundary_corners])
     boundary_xs += (boundary_xs[0],)  # Close the loop
     boundary_ys += (boundary_ys[0],)  # Close the loop
 
@@ -183,5 +190,5 @@ def process_tags(data_storage):
     center_x = (min_x + max_x) / 2
     center_y = (min_y + max_y) / 2
     plot_para = [center_x, center_y, ox, oy, boundary_xs, boundary_ys, corner]
-    #print(map_corners)
+    # print(map_corners)
     return map_corners, plot_para, boundary_corners
