@@ -3,6 +3,7 @@ import time
 import threading
 import atexit
 
+
 class BluetoothInterface:
     def __init__(self, port, baudrate, app):
         self.port = port
@@ -33,6 +34,12 @@ class BluetoothInterface:
                     0, self.app.update_received_message, received_data)
                 # print("WIPER:", received_data)
             # time.sleep(0.1)  # Add a small delay to avoid busy waiting
+
+    def close_serial(self):
+        self.receive_thread_stop.set()  # Signal the receive thread to stop
+        self.receive_thread.join()  # Wait for the receive thread to stop
+        if self.serial_port.is_open:
+            self.serial_port.close()
 
 # bluetooth_init:
 # connects WIPER's bluetooth, make sure you connect with the bluetooth first

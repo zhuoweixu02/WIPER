@@ -172,8 +172,8 @@ def data_collecting_thread(data_queue):
 
 
 if __name__ == "__main__":
-    bluetooth_port = '/dev/cu.HC-06'  # for Mac
-    # bluetooth_port = 'COM6'  # for Windows
+    # bluetooth_port = '/dev/cu.HC-06'  # for Mac
+    bluetooth_port = 'COM4'  # for Windows
 
     root = tk.Tk()
     root.title("WIPER CONTROL")
