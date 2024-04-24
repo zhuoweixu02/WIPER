@@ -1,0 +1,6 @@
+{
+    "configuration": "cpu=atmega328",
+    "board": "arduino:avr:nano",
+    "port": "/dev/tty.usbserial-A1080DBC",
+    "sketch": "wiper_all_in_one.ino"
+}
