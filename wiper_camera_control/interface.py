@@ -1,0 +1,152 @@
+import tkinter as tk
+import queue
+
+
+class App:
+    def __init__(self, root, bluetooth_interface):
+        self.root = root
+        self.bluetooth_interface = bluetooth_interface
+        self.previous_messages = []
+        self.previous_received_messages = []
+        self.current_message_index = -1
+
+        self.frame = tk.Frame(self.root)
+        self.frame.pack()
+
+        self.message_label = tk.Label(self.frame, text="Message:")
+        self.message_label.grid(row=0, column=0)
+        self.message_entry = tk.Entry(self.frame)
+        self.message_entry.grid(row=0, column=1)
+
+        # Bind Return key to send_message_event
+        self.message_entry.bind("<Return>", self.send_message_event)
+
+        self.send_button = tk.Button(
+            self.frame, text="Send", command=self.send_message)
+        self.send_button.grid(row=0, column=2)
+
+        self.message_history_label = tk.Label(
+            self.frame, text="Message History:")
+        self.message_history_label.grid(
+            row=1, column=0, columnspan=3, sticky="w")
+
+        self.message_history_text = tk.Text(self.frame, height=10, width=40)
+        self.message_history_text.grid(row=2, column=0, columnspan=3)
+
+        self.received_message_label = tk.Label(
+            self.frame, text="Received Message:")
+        self.received_message_label.grid(row=3, column=0, sticky="w")
+
+        self.received_message_text = tk.Text(self.frame, height=10, width=150)
+        self.received_message_text.grid(row=4, column=0, columnspan=3)
+
+        # Bind up and down arrow keys to load previous messages
+        self.master.bind("<Up>", self.load_previous_message)
+        self.master.bind("<Down>", self.load_next_message)
+
+        self.canvas_width = 600
+        self.canvas_height = 400
+        self.data_queue = queue.Queue()
+
+        # Initialize the canvas
+        self.canvas = tk.Canvas(
+            root, width=self.canvas_width, height=self.canvas_height, bg='white')
+        self.canvas.pack()
+
+        # Set window title
+        self.root.title("Interface")
+
+        # Start the update checker
+        self.check_for_updates()
+
+    def scale_coord(self, x, y):
+        """ Scale map coordinates to fit the canvas """
+        scale = 200  # Adjust scale factor as needed
+        return (x * scale + 100, self.canvas_height - (y * scale + 200))
+
+    def draw_map(self, map_corners, plot_para):
+        """ Draw the boundary, tags, and center point on the canvas """
+        center_x = plot_para[0]
+        center_y = plot_para[1]
+        ox = plot_para[2]
+        oy = plot_para[3]
+        boundary_xs = plot_para[4]
+        boundary_ys = plot_para[5]
+
+        # Clear the previous map
+        self.canvas.delete("all")
+
+        # Draw boundary
+        scaled_boundary_coords = [self.scale_coord(
+            x, y) for x, y in zip(boundary_xs, boundary_ys)]
+        self.canvas.create_polygon(
+            *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
+
+        # Draw tags and exclusion zones
+        for tag_id, corners in map_corners.items():
+            scaled_corners = [self.scale_coord(
+                corner['x'], corner['y']) for corner in corners]
+            xs, ys = zip(*scaled_corners)
+            self.canvas.create_polygon(
+                *scaled_corners, outline='blue', fill='lightblue', tags=f'Tag {tag_id}')
+            self.canvas.create_text(
+                sum(xs)/len(xs), sum(ys)/len(ys), text=f'Tag {tag_id}')
+
+        # Draw the center point
+        center_coords = self.scale_coord(center_x, center_y)
+        self.canvas.create_oval(
+            center_coords[0]-5, center_coords[1]-5, center_coords[0]+5, center_coords[1]+5, fill='red')
+
+    def check_for_updates(self):
+        """ Check the queue for new data and update the map if necessary """
+        try:
+            map_corners, plot_para = self.data_queue.get_nowait()
+            self.draw_map(map_corners, plot_para)
+        except queue.Empty:
+            pass
+        finally:
+            self.root.after(100, self.check_for_updates)
+
+    def send_message(self):
+        message = self.message_entry.get()
+        self.bluetooth_interface.send_message(message)
+        self.previous_messages.insert(0, message)
+        self.current_message_index = -1
+        self.message_entry.delete(0, tk.END)
+        self.update_message_history()
+
+    def send_message_event(self, event):
+        self.send_message()
+
+    def load_previous_message(self, event):
+        if self.current_message_index < len(self.previous_messages) - 1:
+            self.current_message_index += 1
+        self.update_message_entry()
+
+    def load_next_message(self, event):
+        if self.current_message_index > 0:
+            self.current_message_index -= 1
+        elif self.current_message_index == 0:
+            self.current_message_index = -1
+        self.update_message_entry()
+
+    def update_message_entry(self):
+        if self.current_message_index == -1:
+            self.message_entry.delete(0, tk.END)
+        else:
+            self.message_entry.delete(0, tk.END)
+            self.message_entry.insert(
+                0, self.previous_messages[self.current_message_index])
+
+    def update_message_history(self):
+        self.message_history_text.delete("1.0", tk.END)
+        for message in reversed(self.previous_messages):
+            self.message_history_text.insert(tk.END, message + "\n")
+
+    def update_received_message(self, received_message):
+        self.previous_received_messages.insert(0, received_message)
+        if (len(self.previous_received_messages) > 10):
+            self.previous_received_messages.pop()
+        self.received_message_text.delete("1.0", tk.END)
+        for message in reversed(self.previous_received_messages):
+            self.received_message_text.insert(tk.END, message + "\n")
