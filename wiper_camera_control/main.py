@@ -45,7 +45,7 @@ class App:
             self.frame, text="Received Message:")
         self.received_message_label.grid(row=3, column=0, sticky="w")
 
-        self.received_message_text = tk.Text(self.frame, height=10, width=150)
+        self.received_message_text = tk.Text(self.frame, height=10, width=160)
         self.received_message_text.grid(row=4, column=0, columnspan=3)
 
         # Bind up and down arrow keys to load previous messages
@@ -70,7 +70,7 @@ class App:
     def scale_coord(self, x, y):
         """ Scale map coordinates to fit the canvas """
         scale = 200  # Adjust scale factor as needed
-        return (x * scale + 100, self.canvas_height - (y * scale + 200))
+        return (x * scale, (self.canvas_height - y) * scale)
 
     def draw_map(self, map_corners, plot_para):
         """ Draw the boundary, tags, and center point on the canvas """

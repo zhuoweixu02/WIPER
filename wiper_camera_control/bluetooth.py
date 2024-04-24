@@ -30,7 +30,7 @@ class BluetoothInterface:
                 except UnicodeDecodeError:
                     pass
                 # Update GUI with received message
-                self.app.master.after(
+                self.app.root.after(
                     0, self.app.update_received_message, received_data)
                 # print("WIPER:", received_data)
             # time.sleep(0.1)  # Add a small delay to avoid busy waiting
