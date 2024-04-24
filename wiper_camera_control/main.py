@@ -70,7 +70,8 @@ class App:
     def scale_coord(self, x, y):
         """ Scale map coordinates to fit the canvas """
         scale = 200  # Adjust scale factor as needed
-        return (x * scale, (self.canvas_height - y) * scale)
+        # return (x * scale, (self.canvas_height - y) * scale)
+        return (x * scale + self.canvas_width/2, (self.canvas_height - y) * scale + self.canvas_height/2)
 
     def draw_map(self, map_corners, plot_para):
         """ Draw the boundary, tags, and center point on the canvas """
