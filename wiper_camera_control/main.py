@@ -8,6 +8,7 @@ from bluetooth import BluetoothInterface
 map_corners = {}
 plot_para = []
 boundary_corners = []
+terminate = False
 
 
 class App:
@@ -32,6 +33,10 @@ class App:
         self.send_button = tk.Button(
             self.frame, text="Send", command=self.send_message)
         self.send_button.grid(row=0, column=2)
+
+        self.send_button = tk.Button(
+            self.frame, text="Exit", command=self.terminate_program)
+        self.send_button.grid(row=0, column=3)
 
         self.message_history_label = tk.Label(
             self.frame, text="Message History:")
@@ -61,11 +66,18 @@ class App:
             root, width=self.canvas_width, height=self.canvas_height, bg='white')
         self.canvas.pack()
 
+        self.scorllbar = tk.Scrollbar(self.root)
+
         # Set window title
         self.root.title("Interface")
 
         # Start the update checker
         self.check_for_updates()
+
+    def terminate_program(self):
+        global terminate
+        terminate = True
+        self.root.quit()
 
     def scale_coord(self, x, y):
         """ Scale map coordinates to fit the canvas """
@@ -164,7 +176,7 @@ class App:
 def data_collecting_thread(data_queue):
     # Simulate changing data
     global map_corners, plot_para, boundary_corners
-    while True:
+    while not terminate:
         data_storage = dt.capture_and_process_apriltag_data(
             ignore_first_seconds=0, capture_duration=1)
         map_corners, plot_para, boundary_corners = dt.process_tags(
