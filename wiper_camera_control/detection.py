@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import pandas as pd
 import pupil_apriltags as at
+from itertools import combinations
 
 # initialize_camera_and_detector:
 # launches sequence to begin Intel RealSense SDK, get camera intrinsics
@@ -16,12 +17,13 @@ def initialize_camera_and_detector():
     config = rs.config()
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
-    profile = pipeline.start(config)
-    intr = profile.get_stream(
-        rs.stream.color).as_video_stream_profile().get_intrinsics()
+    pipeline.start(config)
+
+# Setup depth sensor parameters
+    align = rs.align(rs.stream.color)  # Align depth frames to color frames
     detector = at.Detector(families='tagStandard41h12', nthreads=1, quad_decimate=1.0,
                            quad_sigma=0.0, refine_edges=1, decode_sharpening=0.25, debug=0)
-    return pipeline, intr, detector
+    return pipeline, detector, align
 
 # rotatation_matrix_to_euler_angles:
 # calculates the angles of each tags with math
@@ -102,20 +104,17 @@ def capture_and_process_apriltag_data():
 def process_tags(data_storage):
     # Convert the list of lists to a structured array for easier processing
     df = pd.DataFrame(data_storage, columns=['Tag ID', 'X', 'Y', 'Z', 'Yaw'])
+    tag_locations = {}
 
-    # Define the tag IDs you're interested in
-    # Assuming these are the tag IDs you want to process
-    tag_ids = [0, 1, 3, 4]
+    # Find the minimum and maximum values of X and Y
+    tag_min_x = df['X'].min()
+    tag_min_y = df['Y'].min()
 
-    # Manually adding Tag 2 as origin (0, 0)
-    averages = {2: {'X': 0.0, 'Y': 0.0}}
-
-    for tag_id in tag_ids:
+    for tag_id in df['Tag ID'].unique():
         tag_data = df[df['Tag ID'] == tag_id]
         if not tag_data.empty:
-            # Convert from mm to meters directly during averaging
-            avg_data = tag_data.mean() / 1000  # Convert mm to meters
-            averages[tag_id] = {'X': avg_data['X'], 'Y': avg_data['Y']}
+            tag_locations[tag_id] = {
+                'X': tag_data['X'].values[0] - tag_min_x, 'Y': tag_data['Y'].values[0] - tag_min_y}
 
     # Define tag size with safety factor
     # Tag size including safety factor in meters
@@ -124,7 +123,7 @@ def process_tags(data_storage):
 
     # Calculating the corners for each tag
     map_corners = {}
-    for tag_id, avg in averages.items():
+    for tag_id, avg in tag_locations.items():
         x, y = avg['X'], avg['Y']
         map_corners[tag_id] = [
             {'x': x - half_exclusion, 'y': y -
@@ -177,6 +176,6 @@ def process_tags(data_storage):
     # Calculate the center of the map
     center_x = (min_x + max_x) / 2
     center_y = (min_y + max_y) / 2
-    plot_para = [center_x, center_y, ox, oy, boundary_xs, boundary_ys, corner]
+    plot_para = [center_x, center_y, ox, oy, boundary_xs, boundary_ys]
     # print(map_corners)
     return map_corners, plot_para, boundary_corners

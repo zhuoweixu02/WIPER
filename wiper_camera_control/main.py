@@ -6,6 +6,7 @@ import tkinter as tk
 import threading
 import queue
 import time
+from itertools import combinations
 
 import detection as dt
 from bluetooth import BluetoothInterface
@@ -201,61 +202,84 @@ class App:
 def data_collecting_thread(data_queue):
     # Simulate changing data
     global map_corners, plot_para, boundary_corners, current_position, data_storage, flag_terminate
-    pipeline, intr, detector = dt.initialize_camera_and_detector()
+    pipeline, detector, align = dt.initialize_camera_and_detector()
     while not flag_terminate:
         origin_id = 2  # The tag ID to be treated as the origin (0,0)
         origin_position = [0, 0, 0]  # Assuming initial origin position
         origin_yaw = 0  # Assuming initial origin yaw
 
         frames = pipeline.wait_for_frames()
-        depth_frame = frames.get_depth_frame()
-        color_frame = frames.get_color_frame()
+        aligned_frames = align.process(frames)
+        depth_frame = aligned_frames.get_depth_frame()
+        color_frame = aligned_frames.get_color_frame()
+
+        if not depth_frame or not color_frame:
+            continue
 
         depth_image = np.asanyarray(depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
 
+        # Convert BGR to grayscale
         gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-        tags = detector.detect(gray_image, estimate_tag_pose=True, camera_params=[
-            intr.fx, intr.fy, intr.ppx, intr.ppy], tag_size=0.103)
+        # Detect AprilTags in the grayscale image
+        results = detector.detect(gray_image)
+        tag_info = []
+        data_storage = []
 
-        for tag in tags:
-            center = np.mean(tag.corners, axis=0)
-            depth = depth_frame.get_distance(
-                int(center[0]), int(center[1])) * 1000
-            X = depth * (center[0] - intr.ppx) / intr.fx
-            Y = depth * (center[1] - intr.ppy) / intr.fy
-            Z = depth
+        for r in results:
+            # Extract the bounding box and centroid
+            (ptA, ptB, ptC, ptD) = r.corners
+            ptA = np.round(ptA).astype("int")
+            ptB = np.round(ptB).astype("int")
+            ptC = np.round(ptC).astype("int")
+            ptD = np.round(ptD).astype("int")
+            ptCenter = (int(r.center[0]), int(r.center[1]))
 
-            if tag.pose_R is not None:
-                angles_deg = np.degrees(
-                    dt.rotation_matrix_to_euler_angles(tag.pose_R))
-                yaw_angle = angles_deg[2]
-            else:
-                continue  # Skip this tag if no orientation data
+            # Draw the bounding box
+            cv2.line(color_image, tuple(ptA), tuple(ptB), (0, 255, 0), 2)
+            cv2.line(color_image, tuple(ptB), tuple(ptC), (0, 255, 0), 2)
+            cv2.line(color_image, tuple(ptC), tuple(ptD), (0, 255, 0), 2)
+            cv2.line(color_image, tuple(ptD), tuple(ptA), (0, 255, 0), 2)
 
-            if tag.tag_id == origin_id:
-                origin_position = [X, Y, Z]
-                origin_yaw = yaw_angle
-            else:
-                relative_x = X - origin_position[0]
-                relative_y = -(Y - origin_position[1])
-                relative_z = Z - origin_position[2]
-                relative_yaw = yaw_angle - origin_yaw
+            # Get depth and calculate real-world coordinates
+            depth = depth_frame.get_distance(ptCenter[0], ptCenter[1])
+            depth_intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
+            realworld_coords = rs.rs2_deproject_pixel_to_point(
+                depth_intrinsics, [ptCenter[0], ptCenter[1]], depth)
+            tag_info.append((ptCenter, realworld_coords, r.tag_id))
+            one_tag = [r.tag_id, realworld_coords[0],
+                       realworld_coords[1], realworld_coords[2], 0]
+            data_storage.append(one_tag)
 
-                data_storage.append([tag.tag_id, relative_x,
-                                     relative_y, relative_z, relative_yaw])
-        if len(data_storage) > sample_size:
-            map_corners, plot_para, boundary_corners = dt.process_tags(
-                data_storage)  # This will now also capture the map_corners
-            try:
-                x = sum([corner['x'] for corner in map_corners[0]])/4
-                y = sum([corner['y'] for corner in map_corners[0]])/4
-                current_position = {"x": x, "y": y}
-            except:
-                pass
-            data_queue.put((map_corners, plot_para))
-            data_storage = data_storage[5:]
-    pipeline.close()
+            # Annotate the tag ID and its real-world coordinates
+            cv2.putText(color_image, f"ID: {r.tag_id} XYZ: {np.round(realworld_coords, 2)}m",
+                        (ptA[0], ptA[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+
+        # Calculate real-world distances between each pair of tags and draw lines
+        for (pt1, coords1, id1), (pt2, coords2, id2) in combinations(tag_info, 2):
+            cv2.line(color_image, pt1, pt2, (255, 0, 0), 2)
+            distance = np.linalg.norm(np.array(coords1) - np.array(coords2))
+            midpoint = ((pt1[0] + pt2[0]) // 2, (pt1[1] + pt2[1]) // 2)
+            cv2.putText(color_image, f"{distance:.2f}m", midpoint,
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+        # Display the resulting frame
+        cv2.imshow('Frame', color_image)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+        map_corners, plot_para, boundary_corners = dt.process_tags(
+            data_storage)  # This will now also capture the map_corners
+        try:
+            x = sum([corner['x'] for corner in map_corners[0]])/4
+            y = sum([corner['y'] for corner in map_corners[0]])/4
+            current_position = {"x": x, "y": y}
+        except:
+            pass
+        data_queue.put((map_corners, plot_para))
+        data_storage = data_storage[5:]
+    pipeline.stop()
+    cv2.destroyAllWindows()
 
 
 def cmd_write_thread(bluetooth_interface):
@@ -286,10 +310,10 @@ if __name__ == "__main__":
     root.title("WIPER CONTROL")
     app = App(root, None)  # Pass None initially for the BluetoothInterface
 
-    bluetooth_interface = BluetoothInterface(
-        port=bluetooth_port, baudrate=9600, app=app)
-    # Update app's BluetoothInterface reference
-    app.bluetooth_interface = bluetooth_interface
+    # bluetooth_interface = BluetoothInterface(
+    #     port=bluetooth_port, baudrate=9600, app=app)
+    # # Update app's BluetoothInterface reference
+    # app.bluetooth_interface = bluetooth_interface
 
     # Start the background data collecting thread
     thread1 = threading.Thread(
@@ -297,10 +321,10 @@ if __name__ == "__main__":
     thread1.daemon = True
     thread1.start()
 
-    thread2 = threading.Thread(
-        target=cmd_write_thread, args=(bluetooth_interface,))
-    thread2.daemon = True
-    thread2.start()
+    # thread2 = threading.Thread(
+    #     target=cmd_write_thread, args=(bluetooth_interface,))
+    # thread2.daemon = True
+    # thread2.start()
 
     thread3 = threading.Thread(
         target=navigation_thread)

@@ -10,6 +10,9 @@ config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 pipeline.start(config)
 
+# Setup depth sensor parameters
+align = rs.align(rs.stream.color)  # Align depth frames to color frames
+
 try:
     # Create AprilTag detector
     detector = apriltag.Detector(families='tagStandard41h12', nthreads=1, quad_decimate=1.0,
@@ -18,8 +21,9 @@ try:
     while True:
         # Wait for a coherent pair of frames: depth and color
         frames = pipeline.wait_for_frames()
-        depth_frame = frames.get_depth_frame()
-        color_frame = frames.get_color_frame()
+        aligned_frames = align.process(frames)
+        depth_frame = aligned_frames.get_depth_frame()
+        color_frame = aligned_frames.get_color_frame()
 
         if not depth_frame or not color_frame:
             continue
@@ -36,7 +40,7 @@ try:
 
         # Loop over the detected AprilTags
         for r in results:
-            # Extract the bounding box (x, y, width, height) and centroid
+            # Extract the bounding box and centroid
             (ptA, ptB, ptC, ptD) = r.corners
             ptA = np.round(ptA).astype("int")
             ptB = np.round(ptB).astype("int")
@@ -53,8 +57,13 @@ try:
             # Draw the centroid of the tag
             cv2.circle(color_image, ptCenter, 5, (0, 0, 255), -1)
 
-            # Print tag information
-            print(f"Tag ID: {r.tag_id}, Center: {ptCenter}")
+            # Annotate the tag ID and its real-world coordinates
+            depth = depth_frame.get_distance(ptCenter[0], ptCenter[1])
+            depth_intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
+            realworld_coords = rs.rs2_deproject_pixel_to_point(
+                depth_intrinsics, [ptCenter[0], ptCenter[1]], depth)
+            cv2.putText(color_image, f"ID: {r.tag_id} XYZ: {np.round(realworld_coords, 2)}m",
+                        (ptA[0], ptA[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
         # Display the resulting frame
         cv2.imshow('Frame', color_image)
