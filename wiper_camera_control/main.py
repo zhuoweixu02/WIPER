@@ -200,8 +200,8 @@ def data_collecting_thread(data_queue):
         map_corners, plot_para, boundary_corners = dt.process_tags(
             data_storage)  # This will now also capture the map_corners
         try:
-            x = sum([corner['x'] for corner in map_corners["0"]])/4
-            y = sum([corner['y'] for corner in map_corners["0"]])/4
+            x = sum([corner['x'] for corner in map_corners[0]])/4
+            y = sum([corner['y'] for corner in map_corners[0]])/4
             current_position = {"x": x, "y": y}
         except:
             pass
