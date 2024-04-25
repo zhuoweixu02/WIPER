@@ -18,6 +18,7 @@ left = 1
 
 class App:
     def __init__(self, root, bluetooth_interface):
+        global power, left
         self.root = root
         self.bluetooth_interface = bluetooth_interface
         self.previous_messages = []
@@ -38,6 +39,14 @@ class App:
         self.send_button = tk.Button(
             self.frame, text="Send", command=self.send_message)
         self.send_button.grid(row=0, column=2)
+    
+        self.send_button = tk.Button(
+            self.frame, text="Run", command=lambda: setattr(self, 'power', 1))
+        self.send_button.grid(row=0, column=3)
+        
+        self.send_button = tk.Button(
+            self.frame, text="Stop", command=lambda: setattr(self, 'power', 0))
+        self.send_button.grid(row=0, column=3)
 
         self.send_button = tk.Button(
             self.frame, text="Exit", command=self.terminate_program)
