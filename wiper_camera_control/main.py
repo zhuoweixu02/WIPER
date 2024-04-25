@@ -15,7 +15,8 @@ power = 0
 left = 1
 
 flag_terminate = False
-flag_nagivate = False
+
+tolerance = 0.02
 
 
 class App:
@@ -217,10 +218,12 @@ def cmd_write_thread(bluetooth_interface):
 
 
 def navigation_thread():
-    global current_position, target_position, plot_para, flag_terminate, flag_nagivate
+    global current_position, target_position, plot_para, flag_terminate, power
     while not flag_terminate:
         try:
             target_position = {"x": plot_para[0], "y": plot_para[1]}
+            if (abs(current_position['x'] - target_position['x']) < tolerance) and (abs(current_position['y'] - target_position['y']) < tolerance):
+                power = 0
         except:
             pass
         time.sleep(0.1)
