@@ -86,7 +86,7 @@ class App:
 
     def draw_map(self, map_corners, plot_para):
         """ Draw the boundary, tags, and center point on the canvas """
-        center_x = plot_para[0]s
+        center_x = plot_para[0]
         center_y = plot_para[1]
         ox = plot_para[2]
         oy = plot_para[3]
