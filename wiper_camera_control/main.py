@@ -83,11 +83,12 @@ class App:
         terminate = True
         self.root.quit()
 
-    def scale_coord(self, x, y):
+    def scale_coord(self, x, y, minx, miny):
         """ Scale map coordinates to fit the canvas """
         scale = 10  # Adjust scale factor as needed
         # return (x * scale, (self.canvas_height - y) * scale)
-        return (x * scale + self.canvas_width/2, (self.canvas_height - y) * scale + self.canvas_height/2)
+        # return (x * scale + self.canvas_width/2, (self.canvas_height - y) * scale + self.canvas_height/2)
+        return (x * scale - minx * scale + self.canvas_width/2, (self.canvas_height - y) * scale - miny * scale + self.canvas_height/2)
 
     def draw_map(self, map_corners, plot_para):
         """ Draw the boundary, tags, and center point on the canvas """
@@ -109,8 +110,10 @@ class App:
 
         # Draw tags and exclusion zones
         for tag_id, corners in map_corners.items():
+            minx = min([corner['x'] for corner in corners])
+            miny = min([corner['y'] for corner in corners])
             scaled_corners = [self.scale_coord(
-                corner['x'], corner['y']) for corner in corners]
+                corner['x'], corner['y'], minx, miny) for corner in corners]
             xs, ys = zip(*scaled_corners)
             self.canvas.create_polygon(
                 *scaled_corners, outline='blue', fill='lightblue', tags=f'Tag {tag_id}')
