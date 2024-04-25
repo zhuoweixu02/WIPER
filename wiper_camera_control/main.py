@@ -83,7 +83,7 @@ class App:
         offset = 10
         # return (x * scale, (self.canvas_height - y) * scale)
         # return (x * scale + self.canvas_width/2, (self.canvas_height - y) * scale + self.canvas_height/2)
-        return ((x - minx) * scale + offset, (self.canvas_height - (y - miny) * scale - (maxy - miny)) + offset)
+        return ((x - minx) * scale + offset, (self.canvas_height - (y - miny) * scale - (self.canvas_height - (maxy - miny) * scale)) + offset)
 
     def draw_map(self, map_corners, plot_para):
         """ Draw the boundary, tags, and center point on the canvas """
@@ -106,16 +106,6 @@ class App:
             x, y, minx, miny, maxy) for x, y in zip(boundary_xs, boundary_ys)]
         self.canvas.create_polygon(
             *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
-
-        # minx = float('inf')
-        # miny = float('inf')
-        # for tag_id, corners in map_corners.items():
-        #     current_minx = min([corner['x'] for corner in corners])
-        #     current_miny = min([corner['y'] for corner in corners])
-        #     if current_minx < minx:
-        #         minx = current_minx
-        #     if current_miny < miny:
-        #         miny = current_miny
 
         # Draw tags and exclusion zones
         for tag_id, corners in map_corners.items():
