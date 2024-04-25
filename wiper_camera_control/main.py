@@ -152,7 +152,7 @@ class App:
         except queue.Empty:
             pass
         finally:
-            self.root.after(100, self.check_for_updates)
+            self.root.after(1, self.check_for_updates)
 
     def send_message(self):
         message = self.message_entry.get()
@@ -242,13 +242,16 @@ def data_collecting_thread(data_queue):
             depth_intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
             realworld_coords = rs.rs2_deproject_pixel_to_point(
                 depth_intrinsics, [ptCenter[0], ptCenter[1]], depth)
-            tag_info.append((ptCenter, realworld_coords, r.tag_id))
-            one_tag = [r.tag_id, realworld_coords[0],
-                       realworld_coords[1], realworld_coords[2], 0]
+            correct_coords = [realworld_coords[0], -realworld_coords[1], realworld_coords[2]]
+            tag_info.append((ptCenter, correct_coords, r.tag_id))
+            one_tag = [r.tag_id, correct_coords[0],
+                       correct_coords[1], correct_coords[2], 0]
             data_storage.append(one_tag)
 
+
+
             # Annotate the tag ID and its real-world coordinates
-            cv2.putText(color_image, f"ID: {r.tag_id} XYZ: {np.round(realworld_coords, 2)}m",
+            cv2.putText(color_image, f"ID: {r.tag_id} XYZ: {np.round(correct_coords, 2)}m",
                         (ptA[0], ptA[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
         # Calculate real-world distances between each pair of tags and draw lines

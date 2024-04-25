@@ -113,8 +113,10 @@ def process_tags(data_storage):
     for tag_id in df['Tag ID'].unique():
         tag_data = df[df['Tag ID'] == tag_id]
         if not tag_data.empty:
+            x = tag_data['X'].values[0]
+            y = tag_data['Y'].values[0]
             tag_locations[tag_id] = {
-                'X': tag_data['X'].values[0] - tag_min_x, 'Y': tag_data['Y'].values[0] - tag_min_y}
+                'X': x - tag_min_x, 'Y': y - tag_min_y}
 
     # Define tag size with safety factor
     # Tag size including safety factor in meters
@@ -123,8 +125,11 @@ def process_tags(data_storage):
 
     # Calculating the corners for each tag
     map_corners = {}
+    # print(tag_min_x, tag_min_y, end=", ")
     for tag_id, avg in tag_locations.items():
         x, y = avg['X'], avg['Y']
+        text = f"{tag_id}:({x:.2f},{y:.2f})"
+        print(text, end=", ")
         map_corners[tag_id] = [
             {'x': x - half_exclusion, 'y': y -
                 half_exclusion},  # Bottom-left corner
@@ -133,16 +138,13 @@ def process_tags(data_storage):
             {'x': x + half_exclusion, 'y': y + half_exclusion},  # Top-right corner
             {'x': x - half_exclusion, 'y': y + half_exclusion},  # Top-left corner
         ]
+    print("")
 
     ox, oy = [], []
     for corners in map_corners.values():
         for corner in corners:
             ox.append(corner['x'])
             oy.append(corner['y'])
-
-    for tag_id, corners in map_corners.items():
-        corner_xs, corner_ys = zip(
-            *[(corner['x'], corner['y']) for corner in corners])
 
     # Additional variables for boundary definition
     min_x, min_y = float('inf'), float('inf')
