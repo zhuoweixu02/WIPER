@@ -16,7 +16,7 @@ left = 1
 
 flag_terminate = False
 
-tolerance = 0.02
+tolerance = 0.05
 
 
 class App:
