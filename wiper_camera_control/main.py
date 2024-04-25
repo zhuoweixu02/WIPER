@@ -101,7 +101,7 @@ class App:
 
         # Draw boundary
         scaled_boundary_coords = [self.scale_coord(
-            x, y) for x, y in zip(boundary_xs, boundary_ys)]
+            x, y, minx, miny) for x, y in zip(boundary_xs, boundary_ys)]
         self.canvas.create_polygon(
             *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
 
