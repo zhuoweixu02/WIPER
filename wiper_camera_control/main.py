@@ -66,12 +66,6 @@ class App:
             root, width=self.canvas_width, height=self.canvas_height, bg='white')
         self.canvas.pack()
 
-        self.scorllbar = tk.Scrollbar(self.canvas, orient="vertical")
-        self.scorllbar.pack(side="right", fill="y")
-
-        self.canvas.config(yscrollcommand=self.scorllbar.set)
-        self.scorllbar.config(command=self.canvas.yview)
-
         # Set window title
         self.root.title("Interface")
 
@@ -85,14 +79,14 @@ class App:
 
     def scale_coord(self, x, y, minx, miny):
         """ Scale map coordinates to fit the canvas """
-        scale = 10  # Adjust scale factor as needed
+        scale = 100  # Adjust scale factor as needed
         # return (x * scale, (self.canvas_height - y) * scale)
         # return (x * scale + self.canvas_width/2, (self.canvas_height - y) * scale + self.canvas_height/2)
-        return (x * scale - minx * scale + self.canvas_width/2, (self.canvas_height - y) * scale - miny * scale + self.canvas_height/2)
+        return ((x - minx) * scale, self.canvas_height - (y - miny) * scale)
 
     def draw_map(self, map_corners, plot_para):
         """ Draw the boundary, tags, and center point on the canvas """
-        center_x = plot_para[0]
+        center_x = plot_para[0]s
         center_y = plot_para[1]
         ox = plot_para[2]
         oy = plot_para[3]
@@ -108,10 +102,18 @@ class App:
         self.canvas.create_polygon(
             *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
 
+        minx = float('inf')
+        miny = float('inf')
+        for tag_id, corners in map_corners.items():
+            current_minx = min([corner['x'] for corner in corners])
+            current_miny = min([corner['y'] for corner in corners])
+            if current_minx < minx:
+                minx = current_minx
+            if current_miny < miny:
+                miny = current_miny
+
         # Draw tags and exclusion zones
         for tag_id, corners in map_corners.items():
-            minx = min([corner['x'] for corner in corners])
-            miny = min([corner['y'] for corner in corners])
             scaled_corners = [self.scale_coord(
                 corner['x'], corner['y'], minx, miny) for corner in corners]
             xs, ys = zip(*scaled_corners)
@@ -121,7 +123,7 @@ class App:
                 sum(xs)/len(xs), sum(ys)/len(ys), text=f'Tag {tag_id}')
 
         # Draw the center point
-        center_coords = self.scale_coord(center_x, center_y)
+        center_coords = self.scale_coord(center_x, center_y, minx, miny)
         self.canvas.create_oval(
             center_coords[0]-5, center_coords[1]-5, center_coords[0]+5, center_coords[1]+5, fill='red')
 
