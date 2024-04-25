@@ -204,10 +204,6 @@ def data_collecting_thread(data_queue):
     global map_corners, plot_para, boundary_corners, current_position, data_storage, flag_terminate
     pipeline, detector, align = dt.initialize_camera_and_detector()
     while not flag_terminate:
-        origin_id = 2  # The tag ID to be treated as the origin (0,0)
-        origin_position = [0, 0, 0]  # Assuming initial origin position
-        origin_yaw = 0  # Assuming initial origin yaw
-
         frames = pipeline.wait_for_frames()
         aligned_frames = align.process(frames)
         depth_frame = aligned_frames.get_depth_frame()
