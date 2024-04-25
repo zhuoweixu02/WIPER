@@ -43,11 +43,11 @@ class App:
         self.send_button.grid(row=0, column=2)
 
         self.send_button = tk.Button(
-            self.frame, text="Run", command=lambda: globals().update({'power': 1})
+            self.frame, text="Run", command=lambda: globals().update({'power': 1}))
         self.send_button.grid(row=0, column=3)
 
-        self.send_button=tk.Button(
-            self.frame, text="Stop", command=lambda: globals().update({'power': 0})
+        self.send_button = tk.Button(
+            self.frame, text="Stop", command=lambda: globals().update({'power': 0}))
         self.send_button.grid(row=0, column=4)
 
         self.send_button=tk.Button(
@@ -214,11 +214,11 @@ def cmd_write_thread(bluetooth_interface):
         time.sleep(0.1)
 
 def navigation_thread():
-    global current_position, target_position
+    global current_position, target_position, plot_para
     while not terminate and flag_nagivate:
         # Implement your navigation logic here
         # For example, set the target position to the center of the map
-        target_position={"x": 0, "y": 0}
+        target_position={"x": plot_para[0], "y": plot_para[1]}
 
 
 if __name__ == "__main__":
