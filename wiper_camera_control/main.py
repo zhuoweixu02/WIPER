@@ -277,7 +277,6 @@ def data_collecting_thread(data_queue):
         except:
             pass
         data_queue.put((map_corners, plot_para))
-        data_storage = data_storage[5:]
     pipeline.stop()
     cv2.destroyAllWindows()
 
