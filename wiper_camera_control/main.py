@@ -1,6 +1,7 @@
 import tkinter as tk
 import threading
 import queue
+import time
 
 import detection as dt
 from bluetooth import BluetoothInterface
@@ -8,7 +9,11 @@ from bluetooth import BluetoothInterface
 map_corners = {}
 plot_para = []
 boundary_corners = []
+current_position = {"x": 0, "y": 0}
+target_position = {"x": 0, "y": 0}
 terminate = False
+power = 0
+left = 1
 
 
 class App:
@@ -79,10 +84,8 @@ class App:
 
     def scale_coord(self, x, y, minx, miny, maxy):
         """ Scale map coordinates to fit the canvas """
-        scale = 100  # Adjust scale factor as needed
+        scale = 200  # Adjust scale factor as needed
         offset = 10
-        # return (x * scale, (self.canvas_height - y) * scale)
-        # return (x * scale + self.canvas_width/2, (self.canvas_height - y) * scale + self.canvas_height/2)
         return ((x - minx) * scale + offset, (self.canvas_height - (y - miny) * scale - (self.canvas_height - (maxy - miny) * scale)) + offset)
 
     def draw_map(self, map_corners, plot_para):
@@ -179,13 +182,25 @@ class App:
 
 def data_collecting_thread(data_queue):
     # Simulate changing data
-    global map_corners, plot_para, boundary_corners
+    global map_corners, plot_para, boundary_corners, current_position
     while not terminate:
         data_storage = dt.capture_and_process_apriltag_data(
             ignore_first_seconds=0, capture_duration=1)
         map_corners, plot_para, boundary_corners = dt.process_tags(
             data_storage)  # This will now also capture the map_corners
+        try:
+            current_position = map_corners["0"]
+        except:
+            pass
         data_queue.put((map_corners, plot_para))
+
+
+def cmd_write_thread(bluetooth_interface):
+    global power, left, terminate, current_position, target_position
+    while not terminate:
+        cmd = f"{current_position['x']:.3f},{current_position['y']:.3f}|{target_position['x']:.3f},{target_position['y']:.3f}|{left}|{power}\n"
+        bluetooth_interface.send_message(cmd)
+        time.sleep(0.5)
 
 
 if __name__ == "__main__":
@@ -202,9 +217,14 @@ if __name__ == "__main__":
     app.bluetooth_interface = bluetooth_interface
 
     # Start the background data collecting thread
-    thread = threading.Thread(
+    thread1 = threading.Thread(
         target=data_collecting_thread, args=(app.data_queue,))
-    thread.daemon = True
-    thread.start()
+    thread1.daemon = True
+    thread1.start()
+
+    thread2 = threading.Thread(
+        target=cmd_write_thread, args=(bluetooth_interface,))
+    thread2.daemon = True
+    thread2.start()
 
     root.mainloop()
