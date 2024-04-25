@@ -45,7 +45,7 @@ def rotation_matrix_to_euler_angles(R):
 # calculates the relative positions of tags and stores them in data
 
 
-def capture_and_process_apriltag_data():
+def capture_and_process_apriltag_data(ignore_first_seconds, capture_duration):
     pipeline, intr, detector = initialize_camera_and_detector()
 
     data = []  # List to store tag information including relative positions and angles
@@ -53,45 +53,57 @@ def capture_and_process_apriltag_data():
     origin_position = [0, 0, 0]  # Assuming initial origin position
     origin_yaw = 0  # Assuming initial origin yaw
 
-    frames = pipeline.wait_for_frames()
-    depth_frame = frames.get_depth_frame()
-    color_frame = frames.get_color_frame()
+    start_time = time.time()
+    while time.time() - start_time < capture_duration:
+        current_time = time.time()
+        if current_time - start_time > ignore_first_seconds:
+            frames = pipeline.wait_for_frames()
+            depth_frame = frames.get_depth_frame()
+            color_frame = frames.get_color_frame()
 
-    depth_image = np.asanyarray(depth_frame.get_data())
-    color_image = np.asanyarray(color_frame.get_data())
+            if not depth_frame or not color_frame:
+                continue
 
-    gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-    tags = detector.detect(gray_image, estimate_tag_pose=True, camera_params=[
-        intr.fx, intr.fy, intr.ppx, intr.ppy], tag_size=0.103)
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
 
-    for tag in tags:
-    center = np.mean(tag.corners, axis=0)
-    depth = depth_frame.get_distance(
-        int(center[0]), int(center[1])) * 1000
-    X = depth * (center[0] - intr.ppx) / intr.fx
-    Y = depth * (center[1] - intr.ppy) / intr.fy
-    Z = depth
+            gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+            tags = detector.detect(gray_image, estimate_tag_pose=True, camera_params=[
+                                   intr.fx, intr.fy, intr.ppx, intr.ppy], tag_size=0.103)
 
-    if tag.pose_R is not None:
-        angles_deg = np.degrees(
-            rotation_matrix_to_euler_angles(tag.pose_R))
-        yaw_angle = angles_deg[2]
-    else:
-        continue  # Skip this tag if no orientation data
+            for tag in tags:
+                center = np.mean(tag.corners, axis=0)
+                depth = depth_frame.get_distance(
+                    int(center[0]), int(center[1])) * 1000
+                X = depth * (center[0] - intr.ppx) / intr.fx
+                Y = depth * (center[1] - intr.ppy) / intr.fy
+                Z = depth
 
-    if tag.tag_id == origin_id:
-        origin_position = [X, Y, Z]
-        origin_yaw = yaw_angle
-    else:
-        relative_x = X - origin_position[0]
-        relative_y = -(Y - origin_position[1])
-        relative_z = Z - origin_position[2]
-        relative_yaw = yaw_angle - origin_yaw
+                if tag.pose_R is not None:
+                    angles_deg = np.degrees(
+                        rotation_matrix_to_euler_angles(tag.pose_R))
+                    yaw_angle = angles_deg[2]
+                else:
+                    continue  # Skip this tag if no orientation data
 
-        data.append([tag.tag_id, relative_x,
-                    relative_y, relative_z, relative_yaw])
+                if tag.tag_id == origin_id:
+                    origin_position = [X, Y, Z]
+                    origin_yaw = yaw_angle
+                else:
+                    relative_x = X - origin_position[0]
+                    relative_y = -(Y - origin_position[1])
+                    relative_z = Z - origin_position[2]
+                    relative_yaw = yaw_angle - origin_yaw
+
+                    data.append([tag.tag_id, relative_x,
+                                relative_y, relative_z, relative_yaw])
+
+            # cv2.imshow('AprilTag Detection', color_image)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
     pipeline.stop()
+    cv2.destroyAllWindows()
     return data  # Return the data for external use
 
 

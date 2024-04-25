@@ -6,6 +6,7 @@ import time
 import detection as dt
 from bluetooth import BluetoothInterface
 
+data_storage = []
 map_corners = {}
 plot_para = []
 boundary_corners = []
@@ -17,6 +18,7 @@ left = 1
 flag_terminate = False
 
 tolerance = 0.05
+sample_size = 1000
 
 
 class App:
@@ -194,19 +196,21 @@ class App:
 
 def data_collecting_thread(data_queue):
     # Simulate changing data
-    global map_corners, plot_para, boundary_corners, current_position
+    global map_corners, plot_para, boundary_corners, current_position, data_storage, flag_terminate
     while not flag_terminate:
-        data_storage = dt.capture_and_process_apriltag_data(
+        data_storage = data_storage + dt.capture_and_process_apriltag_data(
             ignore_first_seconds=0, capture_duration=1)
-        map_corners, plot_para, boundary_corners = dt.process_tags(
-            data_storage)  # This will now also capture the map_corners
-        try:
-            x = sum([corner['x'] for corner in map_corners[0]])/4
-            y = sum([corner['y'] for corner in map_corners[0]])/4
-            current_position = {"x": x, "y": y}
-        except:
-            pass
-        data_queue.put((map_corners, plot_para))
+        if len(data_storage) > sample_size:
+            map_corners, plot_para, boundary_corners = dt.process_tags(
+                data_storage)  # This will now also capture the map_corners
+            try:
+                x = sum([corner['x'] for corner in map_corners[0]])/4
+                y = sum([corner['y'] for corner in map_corners[0]])/4
+                current_position = {"x": x, "y": y}
+            except:
+                pass
+            data_queue.put((map_corners, plot_para))
+            data_storage = data_storage[5:]
 
 
 def cmd_write_thread(bluetooth_interface):
