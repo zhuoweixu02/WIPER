@@ -65,31 +65,31 @@ def capture_and_process_apriltag_data():
         intr.fx, intr.fy, intr.ppx, intr.ppy], tag_size=0.103)
 
     for tag in tags:
-    center = np.mean(tag.corners, axis=0)
-    depth = depth_frame.get_distance(
-        int(center[0]), int(center[1])) * 1000
-    X = depth * (center[0] - intr.ppx) / intr.fx
-    Y = depth * (center[1] - intr.ppy) / intr.fy
-    Z = depth
+        center = np.mean(tag.corners, axis=0)
+        depth = depth_frame.get_distance(
+            int(center[0]), int(center[1])) * 1000
+        X = depth * (center[0] - intr.ppx) / intr.fx
+        Y = depth * (center[1] - intr.ppy) / intr.fy
+        Z = depth
 
-    if tag.pose_R is not None:
-        angles_deg = np.degrees(
-            rotation_matrix_to_euler_angles(tag.pose_R))
-        yaw_angle = angles_deg[2]
-    else:
-        continue  # Skip this tag if no orientation data
+        if tag.pose_R is not None:
+            angles_deg = np.degrees(
+                rotation_matrix_to_euler_angles(tag.pose_R))
+            yaw_angle = angles_deg[2]
+        else:
+            continue  # Skip this tag if no orientation data
 
-    if tag.tag_id == origin_id:
-        origin_position = [X, Y, Z]
-        origin_yaw = yaw_angle
-    else:
-        relative_x = X - origin_position[0]
-        relative_y = -(Y - origin_position[1])
-        relative_z = Z - origin_position[2]
-        relative_yaw = yaw_angle - origin_yaw
+        if tag.tag_id == origin_id:
+            origin_position = [X, Y, Z]
+            origin_yaw = yaw_angle
+        else:
+            relative_x = X - origin_position[0]
+            relative_y = -(Y - origin_position[1])
+            relative_z = Z - origin_position[2]
+            relative_yaw = yaw_angle - origin_yaw
 
-        data.append([tag.tag_id, relative_x,
-                    relative_y, relative_z, relative_yaw])
+            data.append([tag.tag_id, relative_x,
+                        relative_y, relative_z, relative_yaw])
 
     pipeline.stop()
     return data  # Return the data for external use

@@ -198,8 +198,7 @@ def data_collecting_thread(data_queue):
     # Simulate changing data
     global map_corners, plot_para, boundary_corners, current_position, data_storage, flag_terminate
     while not flag_terminate:
-        data_storage = data_storage + dt.capture_and_process_apriltag_data(
-            ignore_first_seconds=0, capture_duration=1)
+        data_storage = data_storage + dt.capture_and_process_apriltag_data()
         if len(data_storage) > sample_size:
             map_corners, plot_para, boundary_corners = dt.process_tags(
                 data_storage)  # This will now also capture the map_corners
