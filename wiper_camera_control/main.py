@@ -207,15 +207,15 @@ def data_collecting_thread(data_queue):
 
 
 def cmd_write_thread(bluetooth_interface):
-    global power, left, terminate, current_position, target_position
-    while not terminate:
+    global power, left, flag_terminate, current_position, target_position
+    while not flag_terminate:
         cmd=f"{current_position['x']:.3f},{current_position['y']:.3f}|{target_position['x']:.3f},{target_position['y']:.3f}|{left}|{power}\n"
         bluetooth_interface.send_message(cmd)
         time.sleep(0.1)
 
 def navigation_thread():
-    global current_position, target_position, plot_para
-    while not terminate and flag_nagivate:
+    global current_position, target_position, plot_para, flag_terminate, flag_nagivate
+    while not flag_terminate:
         # Implement your navigation logic here
         # For example, set the target position to the center of the map
         target_position={"x": plot_para[0], "y": plot_para[1]}
