@@ -58,7 +58,7 @@ class App:
         self.root.bind("<Down>", self.load_next_message)
 
         self.canvas_width = 600
-        self.canvas_height = 400
+        self.canvas_height = 300
         self.data_queue = queue.Queue()
 
         # Initialize the canvas
@@ -77,12 +77,13 @@ class App:
         terminate = True
         self.root.quit()
 
-    def scale_coord(self, x, y, minx, miny):
+    def scale_coord(self, x, y, minx, miny, maxy):
         """ Scale map coordinates to fit the canvas """
         scale = 100  # Adjust scale factor as needed
+        offset = 10
         # return (x * scale, (self.canvas_height - y) * scale)
         # return (x * scale + self.canvas_width/2, (self.canvas_height - y) * scale + self.canvas_height/2)
-        return ((x - minx) * scale, self.canvas_height - (y - miny) * scale)
+        return ((x - minx) * scale + offset, (self.canvas_height - (y - miny) * scale - (maxy - miny)) + offset)
 
     def draw_map(self, map_corners, plot_para):
         """ Draw the boundary, tags, and center point on the canvas """
@@ -98,10 +99,11 @@ class App:
 
         minx = min([x for x, y in zip(boundary_xs, boundary_ys)])
         miny = min([y for x, y in zip(boundary_xs, boundary_ys)])
+        maxy = max([y for x, y in zip(boundary_xs, boundary_ys)])
 
         # Draw boundary
         scaled_boundary_coords = [self.scale_coord(
-            x, y, minx, miny) for x, y in zip(boundary_xs, boundary_ys)]
+            x, y, minx, miny, maxy) for x, y in zip(boundary_xs, boundary_ys)]
         self.canvas.create_polygon(
             *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
 
@@ -118,7 +120,7 @@ class App:
         # Draw tags and exclusion zones
         for tag_id, corners in map_corners.items():
             scaled_corners = [self.scale_coord(
-                corner['x'], corner['y'], minx, miny) for corner in corners]
+                corner['x'], corner['y'], minx, miny, maxy) for corner in corners]
             xs, ys = zip(*scaled_corners)
             self.canvas.create_polygon(
                 *scaled_corners, outline='blue', fill='lightblue', tags=f'Tag {tag_id}')
@@ -126,7 +128,7 @@ class App:
                 sum(xs)/len(xs), sum(ys)/len(ys), text=f'Tag {tag_id}')
 
         # Draw the center point
-        center_coords = self.scale_coord(center_x, center_y, minx, miny)
+        center_coords = self.scale_coord(center_x, center_y, minx, miny, maxy)
         self.canvas.create_oval(
             center_coords[0]-5, center_coords[1]-5, center_coords[0]+5, center_coords[1]+5, fill='red')
 
