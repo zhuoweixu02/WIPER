@@ -46,11 +46,11 @@ class App:
         
         self.send_button = tk.Button(
             self.frame, text="Stop", command=lambda: setattr(self, 'power', 0))
-        self.send_button.grid(row=0, column=3)
+        self.send_button.grid(row=0, column=4)
 
         self.send_button = tk.Button(
             self.frame, text="Exit", command=self.terminate_program)
-        self.send_button.grid(row=0, column=3)
+        self.send_button.grid(row=0, column=5)
 
         self.message_history_label = tk.Label(
             self.frame, text="Message History:")
