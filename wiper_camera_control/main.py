@@ -96,21 +96,24 @@ class App:
         # Clear the previous map
         self.canvas.delete("all")
 
+        minx = min([x for x, y in zip(boundary_xs, boundary_ys)])
+        miny = min([y for x, y in zip(boundary_xs, boundary_ys)])
+
         # Draw boundary
         scaled_boundary_coords = [self.scale_coord(
             x, y) for x, y in zip(boundary_xs, boundary_ys)]
         self.canvas.create_polygon(
             *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
 
-        minx = float('inf')
-        miny = float('inf')
-        for tag_id, corners in map_corners.items():
-            current_minx = min([corner['x'] for corner in corners])
-            current_miny = min([corner['y'] for corner in corners])
-            if current_minx < minx:
-                minx = current_minx
-            if current_miny < miny:
-                miny = current_miny
+        # minx = float('inf')
+        # miny = float('inf')
+        # for tag_id, corners in map_corners.items():
+        #     current_minx = min([corner['x'] for corner in corners])
+        #     current_miny = min([corner['y'] for corner in corners])
+        #     if current_minx < minx:
+        #         minx = current_minx
+        #     if current_miny < miny:
+        #         miny = current_miny
 
         # Draw tags and exclusion zones
         for tag_id, corners in map_corners.items():
