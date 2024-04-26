@@ -363,7 +363,7 @@ void adjustMotors()
     {
         endTime = millis();
         float wheel_radius = 0.0325;          // meters
-        float speed_offset = 0.1; // -1~+1, neg->loss, pos->gain
+        float speed_offset = 0.3; // -1~+1, neg->loss, pos->gain
         float avg_speed = (RPM_M1 + RPM_M2) / 2 * 2 * PI * wheel_radius / 60; // m/s
         avg_speed = avg_speed*(1+speed_offset);
         instantDistance = avg_speed * (endTime - startTime) / 1000;
