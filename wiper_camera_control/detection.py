@@ -23,7 +23,7 @@ def initialize_camera_and_detector():
     align = rs.align(rs.stream.color)  # Align depth frames to color frames
     detector = at.Detector(families='tagStandard41h12', nthreads=1, quad_decimate=1.0,
                            quad_sigma=0.0, refine_edges=1, decode_sharpening=0.25, debug=0)
-    
+
     # Assuming all tags are the same size and square, here's the tag size in meters
     tag_size = 0.057  # Modify this with your tag size in meters
     object_points = np.array([
@@ -34,7 +34,7 @@ def initialize_camera_and_detector():
     ], dtype=np.float32)
 
     return pipeline, detector, align, tag_size, object_points
-    
+
 
 def get_avg_tag(data):
     df = pd.DataFrame(data, columns=['Tag ID', 'X', 'Y', 'Z'])
@@ -49,14 +49,19 @@ def get_avg_tag(data):
     Z_filtered_df = df[df['Z_Z-Scores'].abs() <= num]
     Z_mean = Z_filtered_df['Z'].mean()
     avg_tag = [df["Tag ID"][0], X_mean,
-            Y_mean, Z_mean]
+               Y_mean, Z_mean]
     return avg_tag
 
+
 def draw_axis(img, corner, imgpts):
-    img = cv2.line(img, corner, tuple(np.round(imgpts[0].ravel()).astype(int)), (255,0,0), 5)
-    img = cv2.line(img, corner, tuple(np.round(imgpts[1].ravel()).astype(int)), (0,255,0), 5)
-    img = cv2.line(img, corner, tuple(np.round(imgpts[2].ravel()).astype(int)), (0,0,255), 5)
+    img = cv2.line(img, corner, tuple(
+        np.round(imgpts[0].ravel()).astype(int)), (255, 0, 0), 5)
+    img = cv2.line(img, corner, tuple(
+        np.round(imgpts[1].ravel()).astype(int)), (0, 255, 0), 5)
+    img = cv2.line(img, corner, tuple(
+        np.round(imgpts[2].ravel()).astype(int)), (0, 0, 255), 5)
     return img
+
 
 def vec_inv(rotation_vector, translation_vector):
     # Calculate inverse transformation from the rotation and translation vectors
@@ -69,6 +74,8 @@ def vec_inv(rotation_vector, translation_vector):
 # VERY IMPORTANT FUNCTION
 # gets data from capture_and_process_apriltag_data
 # builds all elements needed for the map, including corners, boundaries, center, etc
+
+
 def process_tags(data_storage):
     # Convert the list of lists to a structured array for easier processing
     df = pd.DataFrame(data_storage, columns=['Tag ID', 'X', 'Y', 'Z'])
@@ -96,7 +103,7 @@ def process_tags(data_storage):
     # print(tag_min_x, tag_min_y, end=" ")
     for tag_id, avg in tag_locations.items():
         x, y = avg['X'], avg['Y']
-        text = f"{tag_id}:({x:.2f},{y:.2f})"
+
         map_corners[tag_id] = [
             {'x': x - half_exclusion, 'y': y -
                 half_exclusion},  # Bottom-left corner
@@ -105,6 +112,7 @@ def process_tags(data_storage):
             {'x': x + half_exclusion, 'y': y + half_exclusion},  # Top-right corner
             {'x': x - half_exclusion, 'y': y + half_exclusion},  # Top-left corner
         ]
+    #     text = f"{tag_id}:({x:.2f},{y:.2f})"
     #     print(text, end=", ")
     # print("")
 
