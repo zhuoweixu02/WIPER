@@ -9,26 +9,32 @@ import time
 from itertools import combinations
 
 import detection as dt
+import cpp
 from bluetooth import BluetoothInterface
 
-data_storage = []
-map_corners = {}
-plot_para = []
+
+
+origin_id = 2
 boundary_corners = []
+path = []
+quadrant = 0
 current_position = {"x": 0, "y": 0}
 target_position = {"x": 0, "y": 0}
 power = 0
 left = 1
 
 flag_terminate = False
+flag_detectionReady = False
 
 tolerance = 0.05
-sample_size = 100
+resolution = 0.01  # Grid resolution in meters
+robot_radius = 0.12  # Robot radius in meters
+sample_size = 5
 
 
 class App:
     def __init__(self, root, bluetooth_interface):
-        global power
+        global power, quadrant
         self.root = root
         self.bluetooth_interface = bluetooth_interface
         self.previous_messages = []
@@ -51,7 +57,7 @@ class App:
         self.send_button.grid(row=0, column=2)
 
         self.send_button = tk.Button(
-            self.frame, text="Run", command=lambda: globals().update({'power': 1}))
+            self.frame, text="Run", command=lambda: (globals().update({'power': 1}), globals().update({'quadrant': 1})))
         self.send_button.grid(row=0, column=3)
 
         self.send_button = tk.Button(
@@ -107,7 +113,7 @@ class App:
         offset = 10
         return ((x - minx) * scale + offset, (self.canvas_height - (y - miny) * scale - (self.canvas_height - (maxy - miny) * scale)) + offset)
 
-    def draw_map(self, map_corners, plot_para):
+    def draw_map(self, map_corners, plot_para, path):
         """ Draw the boundary, tags, and center point on the canvas """
         center_x = plot_para[0]
         center_y = plot_para[1]
@@ -139,6 +145,17 @@ class App:
             self.canvas.create_text(
                 sum(xs)/len(xs), sum(ys)/len(ys), text=f'Tag {tag_id}')
 
+        for i in range(0,len(path)):
+            point1x, point1y = self.scale_coord(path[i][0], path[i][1], minx, miny, maxy)
+            if (i < len(path) - 1):
+                point2x, point2y = self.scale_coord(path[i+1][0], path[i+1][1], minx, miny, maxy)
+                self.canvas.create_line(point1x, point1y, point2x, point2y, fill='lightblue', width=3)
+                if (i == 0):
+                     self.canvas.create_oval(point1x-5, point1y-5, point1x+5, point1y+5, fill='green')
+            else:
+                self.canvas.create_oval(point1x-5, point1y-5, point1x+5, point1y+5, fill='blue')
+                
+
         # Draw the center point
         center_coords = self.scale_coord(center_x, center_y, minx, miny, maxy)
         self.canvas.create_oval(
@@ -147,8 +164,8 @@ class App:
     def check_for_updates(self):
         """ Check the queue for new data and update the map if necessary """
         try:
-            map_corners, plot_para = self.data_queue.get_nowait()
-            self.draw_map(map_corners, plot_para)
+            map_corners, plot_para, path = self.data_queue.get_nowait()
+            self.draw_map(map_corners, plot_para, path)
         except queue.Empty:
             pass
         finally:
@@ -201,35 +218,69 @@ class App:
 
 def data_collecting_thread(data_queue):
     # Simulate changing data
-    global map_corners, plot_para, boundary_corners, current_position, data_storage, flag_terminate
-    pipeline, detector, align = dt.initialize_camera_and_detector()
+    global sample_size, path, boundary_corners, current_position, flag_terminate, origin_id, flag_detectionReady
+    flag_hasReference = False
+    origin_rvec = []
+    origin_tvec = []
+    data_storage = []
+    map_corners = {}
+    plot_para = []
+    samples = {}
+
+    pipeline, detector, align, tag_size, object_points = dt.initialize_camera_and_detector()
+    
     while not flag_terminate:
+        tag_info = []
+        data_storage = []
+
         frames = pipeline.wait_for_frames()
         aligned_frames = align.process(frames)
         depth_frame = aligned_frames.get_depth_frame()
         color_frame = aligned_frames.get_color_frame()
-
         if not depth_frame or not color_frame:
             continue
-
         depth_image = np.asanyarray(depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
 
         # Convert BGR to grayscale
         gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+
         # Detect AprilTags in the grayscale image
         results = detector.detect(gray_image)
-        tag_info = []
-        data_storage = []
 
+        # Camera intrinsics
+        intrinsics = color_frame.profile.as_video_stream_profile().intrinsics
+        camera_matrix = np.array([
+            [intrinsics.fx, 0, intrinsics.ppx],
+            [0, intrinsics.fy, intrinsics.ppy],
+            [0, 0, 1]
+        ], dtype=np.float32)
+        dist_coeffs = np.zeros((4, 1), dtype=np.float32)  # Assuming no distortion
+
+        # Loop over the detected AprilTags
         for r in results:
             # Extract the bounding box and centroid
             (ptA, ptB, ptC, ptD) = r.corners
+            ptCenter = (int(r.center[0]), int(r.center[1]))
+
+            # Image points must be in the same order as object points
+            image_points = np.array([ptA, ptB, ptC, ptD], dtype=np.float32)
+
+            # Solve PnP
+            axis = np.float32([[tag_size,0,0], [0,tag_size,0], [0,0,tag_size]]).reshape(-1,3)
+            success, rotation_vector, translation_vector = cv2.solvePnP(object_points, image_points, camera_matrix, dist_coeffs)
+            imgpts, jac = cv2.projectPoints(axis, rotation_vector, translation_vector, camera_matrix, dist_coeffs)
+            color_image = dt.draw_axis(color_image,ptCenter,imgpts)
+
+            if (r.tag_id == origin_id):
+                origin_rvec = rotation_vector
+                origin_tvec = translation_vector
+                flag_hasReference = True
+
             ptA = np.round(ptA).astype("int")
             ptB = np.round(ptB).astype("int")
             ptC = np.round(ptC).astype("int")
             ptD = np.round(ptD).astype("int")
-            ptCenter = (int(r.center[0]), int(r.center[1]))
 
             # Draw the bounding box
             cv2.line(color_image, tuple(ptA), tuple(ptB), (0, 255, 0), 2)
@@ -239,21 +290,34 @@ def data_collecting_thread(data_queue):
 
             # Get depth and calculate real-world coordinates
             depth = depth_frame.get_distance(ptCenter[0], ptCenter[1])
-            depth_intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
-            realworld_coords = rs.rs2_deproject_pixel_to_point(
-                depth_intrinsics, [ptCenter[0], ptCenter[1]], depth)
-            correct_coords = [realworld_coords[0], -realworld_coords[1], realworld_coords[2]]
-            tag_info.append((ptCenter, correct_coords, r.tag_id))
-            one_tag = [r.tag_id, correct_coords[0],
-                       correct_coords[1], correct_coords[2], 0]
-            data_storage.append(one_tag)
+            point_in_camera_space = rs.rs2_deproject_pixel_to_point(
+                intrinsics, [ptCenter[0], ptCenter[1]], depth)
+            R_inv, t_inv = dt.vec_inv(rotation_vector, translation_vector)
+            if flag_hasReference:
+                R_inv, t_inv = dt.vec_inv(origin_rvec, origin_tvec)
+            point_in_reference_space = R_inv @ np.array(point_in_camera_space) + t_inv.flatten()
 
-
+            
+            realworld_coords = point_in_reference_space
 
             # Annotate the tag ID and its real-world coordinates
-            cv2.putText(color_image, f"ID: {r.tag_id} XYZ: {np.round(correct_coords, 2)}m",
-                        (ptA[0], ptA[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-
+            cv2.putText(color_image, f"{r.tag_id}: {np.round(realworld_coords, 2)}m",
+                        (ptA[0] - 80, ptA[1] - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+            
+            tag_info.append((ptCenter, realworld_coords, r.tag_id))
+            one_tag = [r.tag_id, realworld_coords[0],
+                       realworld_coords[1], realworld_coords[2]]
+            if (r.tag_id not in samples.keys()):
+                samples[r.tag_id] = []
+            samples[r.tag_id].append(one_tag)
+            if (len(samples[r.tag_id]) > sample_size):
+                avg_tag = dt.get_avg_tag(samples[r.tag_id])
+                data_storage.append(avg_tag)
+                samples[r.tag_id].pop(0)
+                text = f"{avg_tag[0]}:({avg_tag[1]:.2f},{avg_tag[2]:.2f})"
+                print(text, end=", ")
+        
+        print("")
         # Calculate real-world distances between each pair of tags and draw lines
         for (pt1, coords1, id1), (pt2, coords2, id2) in combinations(tag_info, 2):
             cv2.line(color_image, pt1, pt2, (255, 0, 0), 2)
@@ -267,15 +331,21 @@ def data_collecting_thread(data_queue):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-        map_corners, plot_para, boundary_corners = dt.process_tags(
-            data_storage)  # This will now also capture the map_corners
+        map_corners, plot_para, boundary_corners = dt.process_tags(data_storage)  # This will now also capture the map_corners
         try:
             x = sum([corner['x'] for corner in map_corners[0]])/4
             y = sum([corner['y'] for corner in map_corners[0]])/4
             current_position = {"x": x, "y": y}
         except:
             pass
-        data_queue.put((map_corners, plot_para))
+        data_queue.put((map_corners, plot_para, path))
+
+        if (len(data_storage) >= 5):
+            flag_detectionReady = True
+        else:
+            flag_detectionReady = False
+
+        # time.sleep(0.01)
     pipeline.stop()
     cv2.destroyAllWindows()
 
@@ -289,15 +359,31 @@ def cmd_write_thread(bluetooth_interface):
 
 
 def navigation_thread():
-    global current_position, target_position, plot_para, flag_terminate, power
+    global path, quadrant, current_position, target_position, flag_terminate, power, flag_detectionReady, boundary_corners, robot_radius, resolution
+    flag_pathGenerated = False
     while not flag_terminate:
-        try:
-            target_position = {"x": plot_para[0], "y": plot_para[1]}
-            if (abs(current_position['x'] - target_position['x']) < tolerance) and (abs(current_position['y'] - target_position['y']) < tolerance):
+        if flag_detectionReady and quadrant in [1,2,3,4]:
+            if not flag_pathGenerated:
+                ox, oy = cpp.get_quadrant_coordinates(boundary_corners, quadrant)
+                path = cpp.plan_path_with_radius(ox, oy, resolution, robot_radius)
+                if (len(path) > 0):
+                    flag_pathGenerated = True
+            elif (len(path) > 0):
+                target_position = {"x": path[0][0], "y": path[0][1]}
+                power = 1
+                if (abs(current_position['x'] - target_position['x']) < tolerance) and (abs(current_position['y'] - target_position['y']) < tolerance):
+                    path.pop(0)
+            else:
+                quadrant = 0
                 power = 0
-        except:
-            pass
-        time.sleep(0.1)
+                flag_pathGenerated = False
+                path = []
+        else:
+            quadrant = 0
+            power = 0
+            flag_pathGenerated = False
+            path = []
+        time.sleep(0.01)
 
 
 if __name__ == "__main__":

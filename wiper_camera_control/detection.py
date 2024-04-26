@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 import pandas as pd
 import pupil_apriltags as at
-from itertools import combinations
+from scipy.stats import zscore
 
 # initialize_camera_and_detector:
 # launches sequence to begin Intel RealSense SDK, get camera intrinsics
@@ -19,83 +19,51 @@ def initialize_camera_and_detector():
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
     pipeline.start(config)
 
-# Setup depth sensor parameters
+    # Setup depth sensor parameters
     align = rs.align(rs.stream.color)  # Align depth frames to color frames
     detector = at.Detector(families='tagStandard41h12', nthreads=1, quad_decimate=1.0,
                            quad_sigma=0.0, refine_edges=1, decode_sharpening=0.25, debug=0)
-    return pipeline, detector, align
+    
+    # Assuming all tags are the same size and square, here's the tag size in meters
+    tag_size = 0.057  # Modify this with your tag size in meters
+    object_points = np.array([
+        [-tag_size / 2, -tag_size / 2, 0],  # Bottom-left corner
+        [tag_size / 2, -tag_size / 2, 0],  # Bottom-right corner
+        [tag_size / 2, tag_size / 2, 0],  # Top-right corner
+        [-tag_size / 2, tag_size / 2, 0]   # Top-left corner
+    ], dtype=np.float32)
 
-# rotatation_matrix_to_euler_angles:
-# calculates the angles of each tags with math
+    return pipeline, detector, align, tag_size, object_points
+    
 
+def get_avg_tag(data):
+    df = pd.DataFrame(data, columns=['Tag ID', 'X', 'Y', 'Z'])
+    num = 1
+    df['X_Z-Scores'] = zscore(df['X'])
+    X_filtered_df = df[df['X_Z-Scores'].abs() <= num]
+    X_mean = X_filtered_df['X'].mean()
+    df['Y_Z-Scores'] = zscore(df['Y'])
+    Y_filtered_df = df[df['Y_Z-Scores'].abs() <= num]
+    Y_mean = Y_filtered_df['Y'].mean()
+    df['Z_Z-Scores'] = zscore(df['Z'])
+    Z_filtered_df = df[df['Z_Z-Scores'].abs() <= num]
+    Z_mean = Z_filtered_df['Z'].mean()
+    avg_tag = [df["Tag ID"][0], X_mean,
+            Y_mean, Z_mean]
+    return avg_tag
 
-def rotation_matrix_to_euler_angles(R):
-    sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
-    singular = sy < 1e-6
-    if not singular:
-        x = math.atan2(R[2, 1], R[2, 2])
-        y = math.atan2(-R[2, 0], sy)
-        z = math.atan2(R[1, 0], R[0, 0])
-    else:
-        x = math.atan2(-R[1, 2], R[1, 1])
-        y = math.atan2(-R[2, 0], sy)
-        z = 0
-    return np.array([x, y, z])
+def draw_axis(img, corner, imgpts):
+    img = cv2.line(img, corner, tuple(np.round(imgpts[0].ravel()).astype(int)), (255,0,0), 5)
+    img = cv2.line(img, corner, tuple(np.round(imgpts[1].ravel()).astype(int)), (0,255,0), 5)
+    img = cv2.line(img, corner, tuple(np.round(imgpts[2].ravel()).astype(int)), (0,0,255), 5)
+    return img
 
-# capture_and_process_apriltag_data:
-# uses the initialize_camera_and_detector function to get cam intrinsics, and
-# calculates the relative positions of tags and stores them in data
-
-
-def capture_and_process_apriltag_data():
-    pipeline, intr, detector = initialize_camera_and_detector()
-
-    data = []  # List to store tag information including relative positions and angles
-    origin_id = 2  # The tag ID to be treated as the origin (0,0)
-    origin_position = [0, 0, 0]  # Assuming initial origin position
-    origin_yaw = 0  # Assuming initial origin yaw
-
-    frames = pipeline.wait_for_frames()
-    depth_frame = frames.get_depth_frame()
-    color_frame = frames.get_color_frame()
-
-    depth_image = np.asanyarray(depth_frame.get_data())
-    color_image = np.asanyarray(color_frame.get_data())
-
-    gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-    tags = detector.detect(gray_image, estimate_tag_pose=True, camera_params=[
-        intr.fx, intr.fy, intr.ppx, intr.ppy], tag_size=0.103)
-
-    for tag in tags:
-        center = np.mean(tag.corners, axis=0)
-        depth = depth_frame.get_distance(
-            int(center[0]), int(center[1])) * 1000
-        X = depth * (center[0] - intr.ppx) / intr.fx
-        Y = depth * (center[1] - intr.ppy) / intr.fy
-        Z = depth
-
-        if tag.pose_R is not None:
-            angles_deg = np.degrees(
-                rotation_matrix_to_euler_angles(tag.pose_R))
-            yaw_angle = angles_deg[2]
-        else:
-            continue  # Skip this tag if no orientation data
-
-        if tag.tag_id == origin_id:
-            origin_position = [X, Y, Z]
-            origin_yaw = yaw_angle
-        else:
-            relative_x = X - origin_position[0]
-            relative_y = -(Y - origin_position[1])
-            relative_z = Z - origin_position[2]
-            relative_yaw = yaw_angle - origin_yaw
-
-            data.append([tag.tag_id, relative_x,
-                        relative_y, relative_z, relative_yaw])
-
-    pipeline.stop()
-    return data  # Return the data for external use
-
+def vec_inv(rotation_vector, translation_vector):
+    # Calculate inverse transformation from the rotation and translation vectors
+    R, _ = cv2.Rodrigues(rotation_vector)
+    R_inv = R.T
+    t_inv = -R_inv @ translation_vector.reshape(-1, 1)
+    return R_inv, t_inv
 
 # process_tags:
 # VERY IMPORTANT FUNCTION
@@ -103,7 +71,7 @@ def capture_and_process_apriltag_data():
 # builds all elements needed for the map, including corners, boundaries, center, etc
 def process_tags(data_storage):
     # Convert the list of lists to a structured array for easier processing
-    df = pd.DataFrame(data_storage, columns=['Tag ID', 'X', 'Y', 'Z', 'Yaw'])
+    df = pd.DataFrame(data_storage, columns=['Tag ID', 'X', 'Y', 'Z'])
     tag_locations = {}
 
     # Find the minimum and maximum values of X and Y
@@ -125,11 +93,10 @@ def process_tags(data_storage):
 
     # Calculating the corners for each tag
     map_corners = {}
-    # print(tag_min_x, tag_min_y, end=", ")
+    # print(tag_min_x, tag_min_y, end=" ")
     for tag_id, avg in tag_locations.items():
         x, y = avg['X'], avg['Y']
         text = f"{tag_id}:({x:.2f},{y:.2f})"
-        print(text, end=", ")
         map_corners[tag_id] = [
             {'x': x - half_exclusion, 'y': y -
                 half_exclusion},  # Bottom-left corner
@@ -138,7 +105,8 @@ def process_tags(data_storage):
             {'x': x + half_exclusion, 'y': y + half_exclusion},  # Top-right corner
             {'x': x - half_exclusion, 'y': y + half_exclusion},  # Top-left corner
         ]
-    print("")
+    #     print(text, end=", ")
+    # print("")
 
     ox, oy = [], []
     for corners in map_corners.values():
@@ -152,6 +120,8 @@ def process_tags(data_storage):
 
     # Adjust min_x, min_y, max_x, max_y based on the corners
     for tag_id, corners in map_corners.items():
+        if tag_id == 0:
+            continue
         for corner in corners:
             min_x = min(min_x, corner['x'])
             min_y = min(min_y, corner['y'])
@@ -179,5 +149,4 @@ def process_tags(data_storage):
     center_x = (min_x + max_x) / 2
     center_y = (min_y + max_y) / 2
     plot_para = [center_x, center_y, ox, oy, boundary_xs, boundary_ys]
-    # print(map_corners)
     return map_corners, plot_para, boundary_corners

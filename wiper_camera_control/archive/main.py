@@ -1,5 +1,5 @@
 import detection as dt
-import wiper_camera_control.archive.report as rp
+import report as rp
 import tkinter as tk
 import queue
 

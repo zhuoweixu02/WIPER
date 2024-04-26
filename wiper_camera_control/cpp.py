@@ -1,17 +1,7 @@
 import math
 import time
+import numpy as np
 
-def choose_quadrant():
-    quadrants = [1,2,3,4,5]
-    while True:
-        try:
-            choice = int(input("Please choose a quadrant (1-5), 5 is the entire whiteboard: "))
-            if choice in range(1, 6):
-                return quadrants[choice - 1]
-            else:
-                print("Invalid choice. Please choose from 1-5.")
-        except ValueError:
-            print("Invalid input. Please enter a number.")
 
 def get_quadrant_coordinates(boundary_corners, chosen_quadrant):
     """
