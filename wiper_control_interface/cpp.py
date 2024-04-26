@@ -50,7 +50,7 @@ def get_quadrant_coordinates(boundary_corners, chosen_quadrant):
     else:
         raise ValueError("Invalid quadrant choice. Please choose from 1-5.")
 
-def plan_path_with_radius(ox, oy, resolution, radius, moving_direction=1, sweep_direction=1):
+def plan_path_with_radius(ox, oy, resolution, radius, y_offset, moving_direction=1, sweep_direction=1):
     """
     Plans a path for a robot with a specified radius using a sweep search algorithm in a grid environment.
 
@@ -72,7 +72,7 @@ def plan_path_with_radius(ox, oy, resolution, radius, moving_direction=1, sweep_
     margin = int(math.ceil(radius / resolution))
     # margin = 20
     # Vertical step is approximately the robot's diameter
-    vertical_step = int(math.ceil(2 * radius / resolution))
+    vertical_step = int(math.ceil(radius / resolution))
 
     print(
         f"Applying a margin of {margin} grid units on a grid of size {width}x{height}")
@@ -92,7 +92,7 @@ def plan_path_with_radius(ox, oy, resolution, radius, moving_direction=1, sweep_
     x, y = margin, margin
     if navigable_space > 0:  # Only compute path if there's navigable space
         while y < height - margin:
-            current_y = y * resolution + min(oy)
+            current_y = y * resolution + min(oy) + y_offset
             row_start_x = None
             while x < width - margin and grid_map[y, x] == 0:
                 if row_start_x is None:
@@ -110,7 +110,7 @@ def plan_path_with_radius(ox, oy, resolution, radius, moving_direction=1, sweep_
 
             moving_direction *= -1
             x = margin if moving_direction == 1 else width - margin - 1
-            y += vertical_step * sweep_direction  # Increment y by the diameter of the robot
+            y += vertical_step * sweep_direction
     else:
         print("No navigable path available due to margins.")
 

@@ -15,6 +15,7 @@ from bluetooth import BluetoothInterface
 
 origin_id = 2
 boundary_corners = []
+erasiable_corners = []
 path = []
 quadrant = 0
 current_position = {"x": 0, "y": 0}
@@ -26,9 +27,11 @@ flag_terminate = False
 flag_detectionReady = False
 
 tolerance = 0.05
-resolution = 0.01  # Grid resolution in meters
-robot_radius = 0.12  # Robot radius in meters
-sample_size = 5
+resolution = 0.001  # Grid resolution in meters
+robot_radius = 0.08  # Robot radius in meters
+sample_size = 10
+shrink = 0.2
+y_offset = robot_radius/2
 
 
 class App:
@@ -163,7 +166,7 @@ class App:
         offsety = (self.canvas_height - ((maxy - miny) * scale))/2
         return ((x - minx) * scale + offsetx, (self.canvas_height - (y - miny) * scale - (self.canvas_height - (maxy - miny) * scale)) + offsety)
 
-    def draw_map(self, map_corners, plot_para, path):
+    def draw_map(self, map_corners, plot_para, path, erasiable_corners):
         """ Draw the boundary, tags, and center point on the canvas """
         center_x = plot_para[0]
         center_y = plot_para[1]
@@ -188,6 +191,12 @@ class App:
             x, y, minx, maxx, miny, maxy, scale) for x, y in zip(boundary_xs, boundary_ys)]
         self.canvas.create_polygon(
             *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
+        
+        # Draw boundary
+        scaled_earsiabe_coords = [self.scale_coord(
+            point['x'], point['y'], minx, maxx, miny, maxy, scale) for point in erasiable_corners]
+        self.canvas.create_polygon(
+            *scaled_earsiabe_coords, outline='red', fill='', dash=(4, 2))
 
         # Draw tags and exclusion zones
         for tag_id, corners in map_corners.items():
@@ -223,10 +232,10 @@ class App:
     def check_for_updates(self):
         """ Check the queue for new data and update the map if necessary """
         try:
-            map_corners, plot_para, path, status = self.data_queue.get_nowait()
+            map_corners, plot_para, path, status, erasiable_corners = self.data_queue.get_nowait()
             self.status_label.config(
                 text=f"Quadrant: {status[2]}\nPower: {status[0]}\nMode: {status[1]}\nCurrent Position: ({status[3]['x']:.2f}, {status[3]['y']:.2f})\nTarget Position: \t({status[4]['x']:.2f}, {status[4]['y']:.2f})")
-            self.draw_map(map_corners, plot_para, path)
+            self.draw_map(map_corners, plot_para, path, erasiable_corners)
         except queue.Empty:
             pass
         finally:
@@ -283,7 +292,7 @@ class App:
     def update_received_message(self, received_message):
         self.received_message_text.config(state="normal")
         self.previous_received_messages.insert(0, received_message)
-        if (len(self.previous_received_messages) > 100):
+        if (len(self.previous_received_messages) > 10):
             self.previous_received_messages.pop()
         self.received_message_text.delete("1.0", tk.END)
         for message in reversed(self.previous_received_messages):
@@ -293,7 +302,7 @@ class App:
 
 def data_collecting_thread(data_queue):
     # Simulate changing data
-    global sample_size, path, boundary_corners, current_position, flag_terminate, origin_id, flag_detectionReady
+    global sample_size, path, boundary_corners, shrink, erasiable_corners, current_position, flag_terminate, origin_id, flag_detectionReady
     flag_hasReference = False
     origin_rvec = []
     origin_tvec = []
@@ -412,6 +421,8 @@ def data_collecting_thread(data_queue):
 
         map_corners, plot_para, boundary_corners = dt.process_tags(
             data_storage)  # This will now also capture the map_corners
+        erasiable_corners = dt.calculate_erase_area(boundary_corners, shrink)
+
         try:
             x = sum([corner['x'] for corner in map_corners[0]])/4
             y = sum([corner['y'] for corner in map_corners[0]])/4
@@ -419,7 +430,7 @@ def data_collecting_thread(data_queue):
         except:
             pass
         status = [power, mode, quadrant, current_position, target_position]
-        data_queue.put((map_corners, plot_para, path, status))
+        data_queue.put((map_corners, plot_para, path, status, erasiable_corners))
 
         if (len(data_storage) >= 5):
             flag_detectionReady = True
@@ -436,11 +447,11 @@ def cmd_write_thread(bluetooth_interface):
     while not flag_terminate:
         cmd = f"{current_position['x']:.3f},{current_position['y']:.3f}|{target_position['x']:.3f},{target_position['y']:.3f}|{mode}|{power}\n"
         bluetooth_interface.send_message(cmd)
-        time.sleep(0.5)
+        time.sleep(0.2)
 
 
 def navigation_thread():
-    global mode, path, quadrant, current_position, target_position, flag_terminate, power, flag_detectionReady, boundary_corners, robot_radius, resolution
+    global y_offset, mode, path, quadrant, current_position, target_position, flag_terminate, power, flag_detectionReady, erasiable_corners, robot_radius, resolution
     flag_pathGenerated = False
     while not flag_terminate:
         if (abs(current_position['x'] - target_position['x']) < tolerance) and (abs(current_position['y'] - target_position['y']) < tolerance):
@@ -454,9 +465,9 @@ def navigation_thread():
         if flag_detectionReady and quadrant in [1, 2, 3, 4]:
             if not flag_pathGenerated:
                 ox, oy = cpp.get_quadrant_coordinates(
-                    boundary_corners, quadrant)
+                    erasiable_corners, quadrant)
                 path = cpp.plan_path_with_radius(
-                    ox, oy, resolution, robot_radius)
+                    ox, oy, resolution, robot_radius, y_offset)
                 if (len(path) > 0):
                     flag_pathGenerated = True
                     target_position = {"x": path[0][0], "y": path[0][1]}
@@ -466,7 +477,8 @@ def navigation_thread():
                     path.pop(0)
                     mode = 1
                     power = 1
-                target_position = {"x": path[0][0], "y": path[0][1]}
+                if (len(path) > 0):
+                    target_position = {"x": path[0][0], "y": path[0][1]}
             else:
                 quadrant = -1
 
@@ -481,20 +493,20 @@ if __name__ == "__main__":
     root.title("WIPER CONTROL")
     app = App(root, None)  # Pass None initially for the BluetoothInterface
 
-    # bluetooth_interface = BluetoothInterface(
-    #     port=bluetooth_port, baudrate=9600, app=app)
-    # # Update app's BluetoothInterface reference
-    # app.bluetooth_interface = bluetooth_interface
+    bluetooth_interface = BluetoothInterface(
+        port=bluetooth_port, baudrate=9600, app=app)
+    # Update app's BluetoothInterface reference
+    app.bluetooth_interface = bluetooth_interface
 
     thread1 = threading.Thread(
         target=data_collecting_thread, args=(app.data_queue,))
     thread1.daemon = True
     thread1.start()
 
-    # thread2 = threading.Thread(
-    #     target=cmd_write_thread, args=(bluetooth_interface,))
-    # thread2.daemon = True
-    # thread2.start()
+    thread2 = threading.Thread(
+        target=cmd_write_thread, args=(bluetooth_interface,))
+    thread2.daemon = True
+    thread2.start()
 
     thread3 = threading.Thread(
         target=navigation_thread)
@@ -502,3 +514,4 @@ if __name__ == "__main__":
     thread3.start()
 
     root.mainloop()
+    bluetooth_interface.send_message("0,0|0,0|1|0")
