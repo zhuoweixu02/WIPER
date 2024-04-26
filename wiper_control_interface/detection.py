@@ -158,3 +158,17 @@ def process_tags(data_storage):
     center_y = (min_y + max_y) / 2
     plot_para = [center_x, center_y, ox, oy, boundary_xs, boundary_ys]
     return map_corners, plot_para, boundary_corners
+
+
+def calculate_erase_area(boundary_corners, shrink):
+    new_corners = [{},{},{},{}]
+    for i in range(len(boundary_corners)):
+        if (i == 0):
+            new_corners[i] = {'x': boundary_corners[0]['x'] + shrink, 'y': boundary_corners[0]['y'] + shrink}
+        elif (i == 1):
+            new_corners[i] = {'x': boundary_corners[1]['x'] - shrink, 'y': boundary_corners[1]['y'] + shrink}
+        elif (i == 2):
+            new_corners[i] = {'x': boundary_corners[2]['x'] - shrink, 'y': boundary_corners[2]['y'] - shrink}
+        elif (i == 3):
+            new_corners[i] = {'x': boundary_corners[3]['x'] + shrink, 'y': boundary_corners[3]['y'] - shrink}
+    return new_corners
