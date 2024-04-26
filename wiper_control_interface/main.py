@@ -119,12 +119,12 @@ class App:
         self.send_button.grid(row=0, column=5)
 
         self.message_history_label = tk.Label(
-            self.upper_frame_left, text="History:")
+            self.upper_frame_left, text="Message History:")
         self.message_history_label.grid(
-            row=1, column=0, sticky="w")
+            row=1, column=0, columnspan=6)
 
         self.message_history_text = tk.Text(
-            self.upper_frame_left, height=10, width=50)
+            self.upper_frame_left, height=10, width=50, state="disabled")
         self.message_history_text.grid(row=2, column=0, columnspan=6)
 
         self.status_label = tk.Label(self.upper_frame_left, text="")
@@ -136,7 +136,7 @@ class App:
             row=0, column=0, sticky="w")
 
         self.received_message_text = tk.Text(
-            self.lower_frame, height=10, width=160)
+            self.lower_frame, height=10, width=160, state="disabled")
         self.received_message_text.grid(row=1, column=0)
 
         # Bind up and down arrow keys to load previous messages
@@ -157,9 +157,8 @@ class App:
         flag_terminate = True
         self.root.quit()
 
-    def scale_coord(self, x, y, minx, maxx, miny, maxy):
+    def scale_coord(self, x, y, minx, maxx, miny, maxy, scale):
         """ Scale map coordinates to fit the canvas """
-        scale = 200  # Adjust scale factor as needed
         offsetx = (self.canvas_width - (maxx - minx) * scale)/2
         offsety = (self.canvas_height - ((maxy - miny) * scale))/2
         return ((x - minx) * scale + offsetx, (self.canvas_height - (y - miny) * scale - (self.canvas_height - (maxy - miny) * scale)) + offsety)
@@ -180,17 +179,20 @@ class App:
         miny = min([y for x, y in zip(boundary_xs, boundary_ys)])
         maxx = max([x for x, y in zip(boundary_xs, boundary_ys)])
         maxy = max([y for x, y in zip(boundary_xs, boundary_ys)])
+        scaley = abs(self.canvas_height/abs(maxy-miny))
+        scalex = abs(self.canvas_width/abs(maxx-minx))
+        scale = min(scalex, scaley)*0.7
 
         # Draw boundary
         scaled_boundary_coords = [self.scale_coord(
-            x, y, minx, maxx, miny, maxy) for x, y in zip(boundary_xs, boundary_ys)]
+            x, y, minx, maxx, miny, maxy, scale) for x, y in zip(boundary_xs, boundary_ys)]
         self.canvas.create_polygon(
             *scaled_boundary_coords, outline='black', fill='', dash=(4, 2))
 
         # Draw tags and exclusion zones
         for tag_id, corners in map_corners.items():
             scaled_corners = [self.scale_coord(
-                corner['x'], corner['y'], minx, maxx, miny, maxy) for corner in corners]
+                corner['x'], corner['y'], minx, maxx, miny, maxy, scale) for corner in corners]
             xs, ys = zip(*scaled_corners)
             self.canvas.create_polygon(
                 *scaled_corners, outline='blue', fill='lightblue', tags=f'Tag {tag_id}')
@@ -199,10 +201,10 @@ class App:
 
         for i in range(0, len(path)):
             point1x, point1y = self.scale_coord(
-                path[i][0], path[i][1], minx, maxx, miny, maxy)
+                path[i][0], path[i][1], minx, maxx, miny, maxy, scale)
             if (i < len(path) - 1):
                 point2x, point2y = self.scale_coord(
-                    path[i+1][0], path[i+1][1], minx, maxx, miny, maxy)
+                    path[i+1][0], path[i+1][1], minx, maxx, miny, maxy, scale)
                 self.canvas.create_line(
                     point1x, point1y, point2x, point2y, fill='lightblue', width=3)
                 if (i == 0):
@@ -214,7 +216,7 @@ class App:
 
         # Draw the center point
         center_coords = self.scale_coord(
-            center_x, center_y, minx, maxx, miny, maxy)
+            center_x, center_y, minx, maxx, miny, maxy, scale)
         self.canvas.create_oval(
             center_coords[0]-5, center_coords[1]-5, center_coords[0]+5, center_coords[1]+5, fill='red')
 
@@ -223,7 +225,7 @@ class App:
         try:
             map_corners, plot_para, path, status = self.data_queue.get_nowait()
             self.status_label.config(
-                text=f"Power: {status[0]}\nMode: {status[1]}\nQuadrant: {status[2]}\nCurrent Position: ({status[3]['x']:.2f}, {status[3]['y']:.2f})\nTarget Position: \t({status[4]['x']:.2f}, {status[4]['y']:.2f})")
+                text=f"Quadrant: {status[2]}\nPower: {status[0]}\nMode: {status[1]}\nCurrent Position: ({status[3]['x']:.2f}, {status[3]['y']:.2f})\nTarget Position: \t({status[4]['x']:.2f}, {status[4]['y']:.2f})")
             self.draw_map(map_corners, plot_para, path)
         except queue.Empty:
             pass
@@ -231,10 +233,12 @@ class App:
             self.root.after(1, self.check_for_updates)
 
     def send_message(self):
-        global power, mode, target_position
+        global power, mode, target_position, current_position
         message = self.message_entry.get()
         # self.bluetooth_interface.send_message(message)
         try:
+            current_position['x'], current_position['y'] = map(
+                float, message.split("|")[0].split(","))
             target_position['x'], target_position['y'] = map(
                 float, message.split("|")[1].split(","))
             mode = int(message.split("|")[2])
@@ -270,17 +274,21 @@ class App:
                 0, self.previous_messages[self.current_message_index])
 
     def update_message_history(self):
+        self.message_history_text.config(state="normal")
         self.message_history_text.delete("1.0", tk.END)
         for message in reversed(self.previous_messages):
             self.message_history_text.insert(tk.END, message + "\n")
+        self.message_history_text.config(state="disabled")
 
     def update_received_message(self, received_message):
+        self.received_message_text.config(state="normal")
         self.previous_received_messages.insert(0, received_message)
-        if (len(self.previous_received_messages) > 10):
+        if (len(self.previous_received_messages) > 100):
             self.previous_received_messages.pop()
         self.received_message_text.delete("1.0", tk.END)
         for message in reversed(self.previous_received_messages):
             self.received_message_text.insert(tk.END, message + "\n")
+        self.received_message_text.config(state="disabled")
 
 
 def data_collecting_thread(data_queue):
