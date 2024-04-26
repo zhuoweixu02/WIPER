@@ -11,12 +11,7 @@ def get_quadrant_coordinates(boundary_corners, chosen_quadrant):
     Returns:
         list: List of tuples containing the coordinates of each quadrant in the format (xmax, ymin), (xmin, ymin), (xmin, ymax), (xmax, ymax).
     """
-    # Calculating the coordinates for the quadrants
-    # quadrant1 = ((top_left[0], top_left[1]), (top_left[0], mid_y), (mid_x, mid_y), (mid_x, top_left[1]))
-    # quadrant2 = ((bottom_left[0], mid_y), (bottom_left[0], bottom_left[1]), (mid_x, bottom_left[1]), (mid_x, mid_y))
-    # quadrant3 = ((mid_x, mid_y), (mid_x, bottom_left[1]), (bottom_right[0], bottom_right[1]), (bottom_right[0], mid_y))
-    # quadrant4 = ((mid_x, top_right[1]),(mid_x, mid_y), (top_right[0], mid_y), (top_right[0], top_right[1]))
-    # Quadrant 1
+
     # Extracting boundary corner coordinates
     bottom_left = (boundary_corners[0]['x'], boundary_corners[0]['y'])
     bottom_right = (boundary_corners[1]['x'], boundary_corners[1]['y'])
@@ -54,14 +49,6 @@ def get_quadrant_coordinates(boundary_corners, chosen_quadrant):
         return q5x, q5y
     else:
         raise ValueError("Invalid quadrant choice. Please choose from 1-5.")
-
-def adjust_for_robot_radius(path, radius):
-    # Increase the step size to at least the robot's diameter
-    adjusted_path = []
-    step_size = 2 * radius  # Minimum step size is the robot's diameter
-    for (x, y) in path:
-        adjusted_path.append((round(x, 2), round(y, 2)))
-    return adjusted_path
 
 def plan_path_with_radius(ox, oy, resolution, radius, moving_direction=1, sweep_direction=1):
     """
@@ -128,33 +115,3 @@ def plan_path_with_radius(ox, oy, resolution, radius, moving_direction=1, sweep_
         print("No navigable path available due to margins.")
 
     return path  # Ensure a list is always returned
-
-
-def cpp_navi(path, robot_radius, cpp_duration, cpp_frequency, cpp_steps, eraser=1):
-    adjusted_path = adjust_for_robot_radius(path, robot_radius)
-    for target_position in adjusted_path:
-        print(f"Moving to: {target_position}")
-        navigate_robot(ser, target_position, cpp_duration,
-                       cpp_frequency, cpp_steps, tag_id=0, eraser=1)
-        time.sleep(cpp_frequency)  # Wait before issuing the next move
-
-
-def cpp(boundary_corners, eraser=1):
-    chosen_quadrant = choose_quadrant()
-    print(chosen_quadrant)
-    # chosen_quadrant = 1
-    ox, oy = get_quadrant_coordinates(boundary_corners, chosen_quadrant)
-    print(ox)
-    print(oy)
-
-    resolution = 0.01  # Grid resolution in meters
-    robot_radius = 0.12  # Robot radius in meters
-    cpp_duration = 120  # Total duration for navigation
-    cpp_frequency = 3  # Position tracking and adjustment frequency
-    cpp_steps = 3  # Steps to target
-
-    path = plan_path_with_radius(ox, oy, resolution, robot_radius)
-    print(path)
-
-    cpp_navi(path, robot_radius, cpp_duration,
-             cpp_frequency, cpp_steps, eraser)

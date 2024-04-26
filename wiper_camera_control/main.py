@@ -20,7 +20,7 @@ quadrant = 0
 current_position = {"x": 0, "y": 0}
 target_position = {"x": 0, "y": 0}
 power = 0
-mode = 1
+mode = 2
 
 flag_terminate = False
 flag_detectionReady = False
@@ -74,17 +74,21 @@ class App:
             self.upper_frame_right, text="4", width=self.button_size, height=self.button_size, command=lambda: globals().update({'quadrant': 4}))
         self.quadrant4.grid(row=0, column=1)
 
+        self.reset = tk.Button(
+            self.upper_frame_right, text="Reset", width=self.button_size, command=lambda: globals().update({'quadrant': -1}))
+        self.reset.grid(row=2, column=0, columnspan=2)
+
         self.up = tk.Button(
             self.upper_frame_right, text="UP", width=self.button_size, command=lambda: globals().update({'mode': 2}))
-        self.up.grid(row=2, column=0, pady=10)
+        self.up.grid(row=3, column=0, pady=10)
 
         self.down = tk.Button(
             self.upper_frame_right, text="DOWN", width=self.button_size, command=lambda: globals().update({'mode': 1}))
-        self.down.grid(row=2, column=1, pady=10)
+        self.down.grid(row=3, column=1, pady=10)
 
         self.out = tk.Button(
             self.upper_frame_right, text="OUT", width=self.button_size, command=lambda: globals().update({'mode': 3}))
-        self.out.grid(row=3, column=0, columnspan=2)
+        self.out.grid(row=4, column=0, columnspan=2)
 
         self.canvas_width = 600
         self.canvas_height = 300
@@ -141,7 +145,7 @@ class App:
         self.message_entry.bind("<Return>", self.send_message_event)
 
         # Set window title
-        self.root.title("Interface")
+        self.root.title("WIPER Control Interface")
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
@@ -227,8 +231,16 @@ class App:
             self.root.after(1, self.check_for_updates)
 
     def send_message(self):
+        global power, mode, target_position
         message = self.message_entry.get()
-        self.bluetooth_interface.send_message(message)
+        # self.bluetooth_interface.send_message(message)
+        try:
+            target_position['x'], target_position['y'] = map(
+                float, message.split("|")[1].split(","))
+            mode = int(message.split("|")[2])
+            power = int(message.split("|")[3])
+        except:
+            pass
         self.previous_messages.insert(0, message)
         self.current_message_index = -1
         self.message_entry.delete(0, tk.END)
@@ -376,7 +388,7 @@ def data_collecting_thread(data_queue):
         #         text = f"{avg_tag[0]}:({avg_tag[1]:.2f},{avg_tag[2]:.2f})"
         #         print(text, end=", ")
         # print("")
-        
+
         # Calculate real-world distances between each pair of tags and draw lines
         for (pt1, coords1, id1), (pt2, coords2, id2) in combinations(tag_info, 2):
             cv2.line(color_image, pt1, pt2, (255, 0, 0), 2)
@@ -420,9 +432,17 @@ def cmd_write_thread(bluetooth_interface):
 
 
 def navigation_thread():
-    global path, quadrant, current_position, target_position, flag_terminate, power, flag_detectionReady, boundary_corners, robot_radius, resolution
+    global mode, path, quadrant, current_position, target_position, flag_terminate, power, flag_detectionReady, boundary_corners, robot_radius, resolution
     flag_pathGenerated = False
     while not flag_terminate:
+        if (abs(current_position['x'] - target_position['x']) < tolerance) and (abs(current_position['y'] - target_position['y']) < tolerance):
+            power = 0
+        if quadrant == -1:
+            quadrant = 0
+            power = 0
+            mode = 2
+            flag_pathGenerated = False
+            path = []
         if flag_detectionReady and quadrant in [1, 2, 3, 4]:
             if not flag_pathGenerated:
                 ox, oy = cpp.get_quadrant_coordinates(
@@ -431,21 +451,17 @@ def navigation_thread():
                     ox, oy, resolution, robot_radius)
                 if (len(path) > 0):
                     flag_pathGenerated = True
+                    target_position = {"x": path[0][0], "y": path[0][1]}
+                    mode = 2
             elif (len(path) > 0):
-                target_position = {"x": path[0][0], "y": path[0][1]}
-                # power = 1
                 if (abs(current_position['x'] - target_position['x']) < tolerance) and (abs(current_position['y'] - target_position['y']) < tolerance):
                     path.pop(0)
+                    mode = 1
+                    power = 1
+                target_position = {"x": path[0][0], "y": path[0][1]}
             else:
-                quadrant = 0
-                power = 0
-                flag_pathGenerated = False
-                path = []
-        # else:
-        #     quadrant = 0
-        #     power = 0
-        #     flag_pathGenerated = False
-        #     path = []
+                quadrant = -1
+
         time.sleep(0.01)
 
 
@@ -462,7 +478,6 @@ if __name__ == "__main__":
     # # Update app's BluetoothInterface reference
     # app.bluetooth_interface = bluetooth_interface
 
-    # Start the background data collecting thread
     thread1 = threading.Thread(
         target=data_collecting_thread, args=(app.data_queue,))
     thread1.daemon = True
