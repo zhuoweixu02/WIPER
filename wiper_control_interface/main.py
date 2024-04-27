@@ -30,7 +30,9 @@ tolerance = 0.05
 resolution = 0.001  # Grid resolution in meters
 robot_radius = 0.08  # Robot radius in meters
 sample_size = 10
-shrink = 0.2
+tag_size = 0.057
+# shrink = 0.2
+shrink = 0
 y_offset = robot_radius/2
 
 
@@ -302,16 +304,17 @@ class App:
 
 def data_collecting_thread(data_queue):
     # Simulate changing data
-    global sample_size, path, boundary_corners, shrink, erasiable_corners, current_position, flag_terminate, origin_id, flag_detectionReady
+    global tag_size, sample_size, path, boundary_corners, shrink, erasiable_corners, current_position, flag_terminate, origin_id, flag_detectionReady
     flag_hasReference = False
     origin_rvec = []
     origin_tvec = []
+    origin_ptcenter = ()
     data_storage = []
     map_corners = {}
     plot_para = []
     samples = {}
-
-    pipeline, detector, align, tag_size, object_points = dt.initialize_camera_and_detector()
+    
+    pipeline, detector, align, tag_size, object_points = dt.initialize_camera_and_detector(tag_size)
 
     while not flag_terminate:
         tag_info = []
@@ -361,6 +364,7 @@ def data_collecting_thread(data_queue):
             color_image = dt.draw_axis(color_image, ptCenter, imgpts)
 
             if (r.tag_id == origin_id):
+                origin_ptcenter = ptCenter
                 origin_rvec = rotation_vector
                 origin_tvec = translation_vector
                 flag_hasReference = True
@@ -407,12 +411,35 @@ def data_collecting_thread(data_queue):
         # print("")
 
         # Calculate real-world distances between each pair of tags and draw lines
-        for (pt1, coords1, id1), (pt2, coords2, id2) in combinations(tag_info, 2):
-            cv2.line(color_image, pt1, pt2, (255, 0, 0), 2)
-            distance = np.linalg.norm(np.array(coords1) - np.array(coords2))
-            midpoint = ((pt1[0] + pt2[0]) // 2, (pt1[1] + pt2[1]) // 2)
-            cv2.putText(color_image, f"{distance:.2f}m", midpoint,
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+        # for (pt1, coords1, id1), (pt2, coords2, id2) in combinations(tag_info, 2):
+        #     cv2.line(color_image, pt1, pt2, (255, 0, 0), 2)
+        #     distance = np.linalg.norm(np.array(coords1) - np.array(coords2))
+        #     midpoint = ((pt1[0] + pt2[0]) // 2, (pt1[1] + pt2[1]) // 2)
+        #     cv2.putText(color_image, f"{distance:.2f}m", midpoint,
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+        
+        if (flag_detectionReady):
+            try:
+                for i in range(0, len(path)):
+                    point_in_reference_space1= [path[i][0], path[i][1], 0]
+                    imgpts1, jac = cv2.projectPoints(
+                    np.array([point_in_reference_space1]), origin_rvec, origin_tvec, camera_matrix, dist_coeffs)
+                    point1 = tuple(np.round(imgpts1[0].ravel()).astype(int))
+                    # point1 = (point1[0], point1[1] + origin_ptcenter[1])
+                    if (i < len(path) - 1):
+                        point_in_reference_space2= [path[i+1][0], path[i+1][1], 0]
+                        imgpts2, jac = cv2.projectPoints(
+                        np.array([point_in_reference_space2]), origin_rvec, origin_tvec, camera_matrix, dist_coeffs)
+                        point2 = tuple(np.round(imgpts2[0].ravel()).astype(int))
+                        # point2 = (point2[0], point2[1] + origin_ptcenter[1])
+                        cv2.line(color_image, point1, point2, (255, 0, 0), 2)
+                        if (i == 0):
+                            cv2.circle(color_image, point1, 5, (0, 255, 0))
+                    else:
+                        cv2.circle(color_image, point1, 5, (150, 0, 0))
+            except:
+                pass
+
 
         # Display the resulting frame
         cv2.imshow('Frame', color_image)
@@ -420,7 +447,7 @@ def data_collecting_thread(data_queue):
             break
 
         map_corners, plot_para, boundary_corners = dt.process_tags(
-            data_storage)  # This will now also capture the map_corners
+            data_storage, tag_size)
         erasiable_corners = dt.calculate_erase_area(boundary_corners, shrink)
 
         try:
@@ -495,7 +522,6 @@ if __name__ == "__main__":
 
     bluetooth_interface = BluetoothInterface(
         port=bluetooth_port, baudrate=9600, app=app)
-    # Update app's BluetoothInterface reference
     app.bluetooth_interface = bluetooth_interface
 
     thread1 = threading.Thread(

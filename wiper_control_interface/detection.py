@@ -12,7 +12,7 @@ from scipy.stats import zscore
 # launches AprilTag recognition
 
 
-def initialize_camera_and_detector():
+def initialize_camera_and_detector(tag_size):
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
@@ -25,7 +25,6 @@ def initialize_camera_and_detector():
                            quad_sigma=0.0, refine_edges=1, decode_sharpening=0.25, debug=0)
 
     # Assuming all tags are the same size and square, here's the tag size in meters
-    tag_size = 0.057  # Modify this with your tag size in meters
     object_points = np.array([
         [-tag_size / 2, -tag_size / 2, 0],  # Bottom-left corner
         [tag_size / 2, -tag_size / 2, 0],  # Bottom-right corner
@@ -76,7 +75,7 @@ def vec_inv(rotation_vector, translation_vector):
 # builds all elements needed for the map, including corners, boundaries, center, etc
 
 
-def process_tags(data_storage):
+def process_tags(data_storage, tag_size):
     # Convert the list of lists to a structured array for easier processing
     df = pd.DataFrame(data_storage, columns=['Tag ID', 'X', 'Y', 'Z'])
     tag_locations = {}
@@ -95,7 +94,8 @@ def process_tags(data_storage):
 
     # Define tag size with safety factor
     # Tag size including safety factor in meters
-    tag_size_with_safety = 0.103 * (1 + 0.20)
+    # tag_size_with_safety = tag_size * (1 + 0.20)
+    tag_size_with_safety = tag_size
     half_exclusion = tag_size_with_safety / 2
 
     # Calculating the corners for each tag
