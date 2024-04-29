@@ -31,8 +31,7 @@ resolution = 0.001  # Grid resolution in meters
 robot_radius = 0.08  # Robot radius in meters
 sample_size = 10
 tag_size = 0.057
-# shrink = 0.2
-shrink = 0
+shrink = 0.10
 y_offset = robot_radius/2
 
 
@@ -308,6 +307,7 @@ def data_collecting_thread(data_queue):
     flag_hasReference = False
     origin_rvec = []
     origin_tvec = []
+    origin_coords = []
     origin_ptcenter = ()
     data_storage = []
     map_corners = {}
@@ -392,6 +392,9 @@ def data_collecting_thread(data_queue):
 
             realworld_coords = point_in_reference_space
 
+            if (r.tag_id == origin_id):
+                origin_coords = point_in_reference_space
+
             # Annotate the tag ID and its real-world coordinates
             cv2.putText(color_image, f"{r.tag_id}: {np.round(realworld_coords, 2)}m",
                         (ptA[0] - 80, ptA[1] - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
@@ -421,13 +424,13 @@ def data_collecting_thread(data_queue):
         if (flag_detectionReady):
             try:
                 for i in range(0, len(path)):
-                    point_in_reference_space1= [path[i][0], path[i][1], 0]
+                    point_in_reference_space1= [path[i][0]+origin_coords[0], path[i][1]+origin_coords[1], origin_coords[2]]
                     imgpts1, jac = cv2.projectPoints(
                     np.array([point_in_reference_space1]), origin_rvec, origin_tvec, camera_matrix, dist_coeffs)
                     point1 = tuple(np.round(imgpts1[0].ravel()).astype(int))
                     # point1 = (point1[0], point1[1] + origin_ptcenter[1])
                     if (i < len(path) - 1):
-                        point_in_reference_space2= [path[i+1][0], path[i+1][1], 0]
+                        point_in_reference_space2= [path[i+1][0]+origin_coords[0], path[i+1][1]+origin_coords[1], origin_coords[2]]
                         imgpts2, jac = cv2.projectPoints(
                         np.array([point_in_reference_space2]), origin_rvec, origin_tvec, camera_matrix, dist_coeffs)
                         point2 = tuple(np.round(imgpts2[0].ravel()).astype(int))
@@ -474,7 +477,7 @@ def cmd_write_thread(bluetooth_interface):
     while not flag_terminate:
         cmd = f"{current_position['x']:.3f},{current_position['y']:.3f}|{target_position['x']:.3f},{target_position['y']:.3f}|{mode}|{power}\n"
         bluetooth_interface.send_message(cmd)
-        time.sleep(0.2)
+        time.sleep(0.25)
 
 
 def navigation_thread():
