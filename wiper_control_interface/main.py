@@ -31,7 +31,7 @@ resolution = 0.001  # Grid resolution in meters
 robot_radius = 0.08  # Robot radius in meters
 sample_size = 10
 tag_size = 0.057
-shrink = 0.10
+shrink = 0.12
 y_offset = robot_radius/2
 
 
@@ -523,17 +523,17 @@ if __name__ == "__main__":
     root.title("WIPER CONTROL")
     app = App(root, None)  # Pass None initially for the BluetoothInterface
 
-    bluetooth_interface = BluetoothInterface(
-        port=bluetooth_port, baudrate=9600, app=app)
-    app.bluetooth_interface = bluetooth_interface
-
-    thread1 = threading.Thread(
-        target=data_collecting_thread, args=(app.data_queue,))
-    thread1.daemon = True
-    thread1.start()
+    # bluetooth_interface = BluetoothInterface(
+    #     port=bluetooth_port, baudrate=9600, app=app)
+    # app.bluetooth_interface = bluetooth_interface
+    
+    # thread1 = threading.Thread(
+    #     target=cmd_write_thread, args=(bluetooth_interface,))
+    # thread1.daemon = True
+    # thread1.start()
 
     thread2 = threading.Thread(
-        target=cmd_write_thread, args=(bluetooth_interface,))
+        target=data_collecting_thread, args=(app.data_queue,))
     thread2.daemon = True
     thread2.start()
 
@@ -543,4 +543,3 @@ if __name__ == "__main__":
     thread3.start()
 
     root.mainloop()
-    bluetooth_interface.send_message("0,0|0,0|1|0")

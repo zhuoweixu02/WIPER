@@ -36,6 +36,7 @@ class BluetoothInterface:
             # time.sleep(0.1)  # Add a small delay to avoid busy waiting
 
     def close_serial(self):
+        self.send_message("0,0|0,0|1|0")
         self.receive_thread_stop.set()  # Signal the receive thread to stop
         self.receive_thread.join()  # Wait for the receive thread to stop
         if self.serial_port.is_open:
