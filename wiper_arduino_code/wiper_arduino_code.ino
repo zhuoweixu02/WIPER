@@ -36,11 +36,11 @@ float posiprev_M1 = 0; // Previous position for motor 1
 float posiprev_M2 = 0; // Previous position for motor 2
 float RPM_M1;
 float RPM_M2;
-double Kp = 0, Ki = 5, Kd = 0;
+double Kp = 0, Ki = 10, Kd = 0;
 const int offsetA = 1;
 const int offsetB = 1;
 float RPM_default = 50;
-float RPM_turn = 20;
+float RPM_turn = 30;
 int driveM1, driveM2;
 float instantDistance = 0;
 float startTime, endTime;
