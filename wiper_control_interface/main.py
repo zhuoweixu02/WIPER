@@ -31,7 +31,7 @@ resolution = 0.001  # Grid resolution in meters
 robot_radius = 0.08  # Robot radius in meters
 sample_size = 10
 tag_size = 0.057
-shrink = 0.12
+shrink = 0.15
 y_offset = robot_radius/2
 
 
@@ -308,6 +308,7 @@ def data_collecting_thread(data_queue):
     origin_rvec = []
     origin_tvec = []
     origin_coords = []
+    origin_depth = 0
     origin_ptcenter = ()
     data_storage = []
     map_corners = {}
@@ -381,7 +382,12 @@ def data_collecting_thread(data_queue):
             cv2.line(color_image, tuple(ptD), tuple(ptA), (0, 255, 0), 2)
 
             # Get depth and calculate real-world coordinates
-            depth = depth_frame.get_distance(ptCenter[0], ptCenter[1])
+            depth = 0
+            if (r.tag_id == origin_id):
+                depth = depth_frame.get_distance(ptCenter[0], ptCenter[1])
+                origin_depth = depth
+            elif (len(origin_coords) > 0):
+                depth = origin_depth
             point_in_camera_space = rs.rs2_deproject_pixel_to_point(
                 intrinsics, [ptCenter[0], ptCenter[1]], depth)
             R_inv, t_inv = dt.vec_inv(rotation_vector, translation_vector)
@@ -394,6 +400,8 @@ def data_collecting_thread(data_queue):
 
             if (r.tag_id == origin_id):
                 origin_coords = point_in_reference_space
+            # elif len(origin_coords) != 0:
+            #     realworld_coords = np.array([realworld_coords[0]+origin_coords[0], realworld_coords[1]+origin_coords[1], origin_coords[2]])
 
             # Annotate the tag ID and its real-world coordinates
             cv2.putText(color_image, f"{r.tag_id}: {np.round(realworld_coords, 2)}m",
@@ -523,14 +531,14 @@ if __name__ == "__main__":
     root.title("WIPER CONTROL")
     app = App(root, None)  # Pass None initially for the BluetoothInterface
 
-    # bluetooth_interface = BluetoothInterface(
-    #     port=bluetooth_port, baudrate=9600, app=app)
-    # app.bluetooth_interface = bluetooth_interface
+    bluetooth_interface = BluetoothInterface(
+        port=bluetooth_port, baudrate=9600, app=app)
+    app.bluetooth_interface = bluetooth_interface
     
-    # thread1 = threading.Thread(
-    #     target=cmd_write_thread, args=(bluetooth_interface,))
-    # thread1.daemon = True
-    # thread1.start()
+    thread1 = threading.Thread(
+        target=cmd_write_thread, args=(bluetooth_interface,))
+    thread1.daemon = True
+    thread1.start()
 
     thread2 = threading.Thread(
         target=data_collecting_thread, args=(app.data_queue,))
