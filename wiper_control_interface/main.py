@@ -429,6 +429,7 @@ def data_collecting_thread(data_queue):
         #     cv2.putText(color_image, f"{distance:.2f}m", midpoint,
         #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
         
+        # Draw path
         if (flag_detectionReady):
             try:
                 for i in range(0, len(path)):
@@ -436,13 +437,11 @@ def data_collecting_thread(data_queue):
                     imgpts1, jac = cv2.projectPoints(
                     np.array([point_in_reference_space1]), origin_rvec, origin_tvec, camera_matrix, dist_coeffs)
                     point1 = tuple(np.round(imgpts1[0].ravel()).astype(int))
-                    # point1 = (point1[0], point1[1] + origin_ptcenter[1])
                     if (i < len(path) - 1):
                         point_in_reference_space2= [path[i+1][0]+origin_coords[0], path[i+1][1]+origin_coords[1], origin_coords[2]]
                         imgpts2, jac = cv2.projectPoints(
                         np.array([point_in_reference_space2]), origin_rvec, origin_tvec, camera_matrix, dist_coeffs)
                         point2 = tuple(np.round(imgpts2[0].ravel()).astype(int))
-                        # point2 = (point2[0], point2[1] + origin_ptcenter[1])
                         cv2.line(color_image, point1, point2, (255, 0, 0), 2)
                         if (i == 0):
                             cv2.circle(color_image, point1, 5, (0, 255, 0))
