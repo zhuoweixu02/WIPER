@@ -31,12 +31,19 @@ volatile int posi_M2 = 0;
 // volatile float time = 0;
 double SetpointM1, InputM1, OutputM1, TargetM1 = 0;
 double SetpointM2, InputM2, OutputM2, TargetM2 = 0;
+
+double mapped_v1, mapped_v2=0;
+
 float prevT = 0;       // Previous time
 float posiprev_M1 = 0; // Previous position for motor 1
 float posiprev_M2 = 0; // Previous position for motor 2
 float RPM_M1;
 float RPM_M2;
 double Kp = 0, Ki = 10, Kd = 0;
+
+double Kp1 = 0, Ki1 = 10, Kd1 = 0;
+double Kp2 = 0, Ki2 = 10, Kd2 = 0;
+
 const int offsetA = 1;
 const int offsetB = 1;
 float RPM_default = 50;
@@ -44,8 +51,10 @@ float RPM_turn = 30;
 int driveM1, driveM2;
 float instantDistance = 0;
 float startTime, endTime;
+
 PID myPIDM1(&InputM1, &OutputM1, &SetpointM1, Kp, Ki, Kd, DIRECT);
 PID myPIDM2(&InputM2, &OutputM2, &SetpointM2, Kp, Ki, Kd, DIRECT);
+
 Motor motor1 = Motor(AIN1_M1, AIN2_M1, PWM_M1, offsetA, STBY);
 Motor motor2 = Motor(BIN1_M2, BIN2_M2, PWM_M2, offsetB, STBY);
 
@@ -103,7 +112,7 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(ENCA_M1), readEncoderM1, RISING);
     attachInterrupt(digitalPinToInterrupt(ENCA_M2), readEncoderM2, RISING);
     SetpointM1 = TargetM1 + 255;
-    SetpointM2 = TargetM2 + 255;
+    SetpointM2 = 0 + 255;
     myPIDM1.SetMode(AUTOMATIC);
     myPIDM2.SetMode(AUTOMATIC);
 
@@ -119,15 +128,15 @@ void loop()
     startTime = millis();
 
     SetpointM1 = TargetM1 + 255;
-    SetpointM2 = TargetM2 + 255;
+    SetpointM2 = 0 + 255;
 
     calculateSpeed();
     if (power)
     {
         myPIDM1.Compute();
         myPIDM2.Compute();
-        driveM1 = map(OutputM1, 0, 255, -255, 255);
-        driveM2 = map(OutputM2, 0, 255, -255, 255);
+        driveM1 = map(OutputM1+OutputM2, 0, 255, -255, 255);
+        driveM2 = map(OutputM2_OutputM2, 0, 255, -255, 255);
         int minimum_limit = 10;
         if (abs(driveM1) < minimum_limit)
         {
@@ -521,6 +530,13 @@ void calculateSpeed()
     prevT = currT;
 
     float maximum_limit = 251;
-    InputM1 = map(RPM_M1, -maximum_limit, maximum_limit, 0, 510);
-    InputM2 = map(RPM_M2, -maximum_limit, maximum_limit, 0, 510);
+    mapped_v1 = map(RPM_M1, -maximum_limit, maximum_limit, 0, 510);
+    mapped_v2 = map(RPM_M2, -maximum_limit, maximum_limit, 0, 510);
+    coupleMotors();
+}
+
+void coupleMotors()
+{
+    InputM1 = (mapped_v1+mapped_v2)/2;
+    InputM2 = (mapped_v1-mapped_v2)/2;
 }
