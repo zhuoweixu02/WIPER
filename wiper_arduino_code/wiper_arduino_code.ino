@@ -392,50 +392,68 @@ void adjustMotors()
 
 void reportData(bool isBluetooth)
 {
-    char buffer[200];    // Define a buffer to hold the formatted data
-    char tempBuffer[20]; // Temporary buffer to hold the converted doubleing-point numbers
+    char buffer[80];
+    char tempBuffer[20];
 
-    // Convert num to string with 6 characters and 2 decimal places
     int numLen = 4;
     int numDec = 1;
 
-    snprintf(buffer, sizeof(buffer), "%s ", power ? "ON" : "OFF");
-
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "M%d ", mode);
-    dtostrf(batteryVoltage, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%sV | ", tempBuffer);
-    dtostrf(carx, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "(%sm,", tempBuffer);
-    dtostrf(cary, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%sm)=>", tempBuffer);
-    // dtostrf(deg, numLen, numDec, tempBuffer);
-    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s°, ", tempBuffer);
-    dtostrf(targetx, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "(%sm, ", tempBuffer);
-    dtostrf(targety, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%sm) | ", tempBuffer);
-
     dtostrf(RPM_M1, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "L %s =[%4d]=>", tempBuffer, driveM1);
+    snprintf(buffer, sizeof(buffer), "%s ", tempBuffer);
+
+    dtostrf(RPM_M2, numLen, numDec, tempBuffer);
+    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s ", tempBuffer);
+
     dtostrf(TargetM1, numLen, numDec, tempBuffer);
     snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s ", tempBuffer);
-    dtostrf(RPM_M2, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "R %s =[%4d]=>", tempBuffer, driveM2);
-    dtostrf(TargetM2, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s | ", tempBuffer);
-    dtostrf(targetAngle, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "TarDeg %s° ", tempBuffer);
-    dtostrf(targetDistance, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "TarDis %sm | ", tempBuffer);
 
-    // dtostrf(pitch, numLen, numDec, tempBuffer);
-    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "Pitch: %s° ", tempBuffer);
-    // dtostrf(roll, numLen, numDec, tempBuffer);
-    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "Roll: %s° ", tempBuffer);
-    dtostrf(degToX, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "CurrDeg: %s° ", tempBuffer);
-    dtostrf(currDistance, numLen, numDec, tempBuffer);
-    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "CurrDis: %sm\n", tempBuffer);
+    dtostrf(TargetM2, numLen, numDec, tempBuffer);
+    snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s\n", tempBuffer);
+
+    // char buffer[200];    // Define a buffer to hold the formatted data
+    // char tempBuffer[20]; // Temporary buffer to hold the converted doubleing-point numbers
+
+    // // Convert num to string with 6 characters and 2 decimal places
+    // int numLen = 4;
+    // int numDec = 1;
+
+    // snprintf(buffer, sizeof(buffer), "%s ", power ? "ON" : "OFF");
+
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "M%d ", mode);
+    // dtostrf(batteryVoltage, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%sV | ", tempBuffer);
+    // dtostrf(carx, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "(%sm,", tempBuffer);
+    // dtostrf(cary, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%sm)=>", tempBuffer);
+    // // dtostrf(deg, numLen, numDec, tempBuffer);
+    // // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s°, ", tempBuffer);
+    // dtostrf(targetx, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "(%sm, ", tempBuffer);
+    // dtostrf(targety, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%sm) | ", tempBuffer);
+
+    // dtostrf(RPM_M1, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "L %s =[%4d]=>", tempBuffer, driveM1);
+    // dtostrf(TargetM1, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s ", tempBuffer);
+    // dtostrf(RPM_M2, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "R %s =[%4d]=>", tempBuffer, driveM2);
+    // dtostrf(TargetM2, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s | ", tempBuffer);
+    // dtostrf(targetAngle, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "TarDeg %s° ", tempBuffer);
+    // dtostrf(targetDistance, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "TarDis %sm | ", tempBuffer);
+
+    // // dtostrf(pitch, numLen, numDec, tempBuffer);
+    // // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "Pitch: %s° ", tempBuffer);
+    // // dtostrf(roll, numLen, numDec, tempBuffer);
+    // // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "Roll: %s° ", tempBuffer);
+    // dtostrf(degToX, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "CurrDeg: %s° ", tempBuffer);
+    // dtostrf(currDistance, numLen, numDec, tempBuffer);
+    // snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "CurrDis: %sm\n", tempBuffer);
 
     // Print the formatted data from the buffer
     if (isBluetooth)
